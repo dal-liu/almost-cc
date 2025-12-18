@@ -43,6 +43,5 @@ pub fn create_contexts(func: &Function) -> Vec<Context> {
     }
 
     contexts.retain(|ctx| !ctx.inst_ids.is_empty());
-
     contexts
 }

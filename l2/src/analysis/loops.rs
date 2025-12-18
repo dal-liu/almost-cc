@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use l2::*;
 use utils::BitVector;
 
-use crate::analysis::dominators::DominatorTree;
+use crate::analysis::dominators::{DominatorTree, compute_dominators};
 
 type LoopId = usize;
 
@@ -14,14 +14,18 @@ pub struct LoopForest {
 }
 
 impl LoopForest {
-    pub fn new(func: &Function, dt: &DominatorTree) -> Self {
+    pub fn new(func: &Function, dominators: &DominatorTree) -> Self {
         let num_blocks = func.basic_blocks.len();
 
         let back_edges = func.basic_blocks.iter().flat_map(|block| {
             let latch = block.id;
             func.cfg.successors[latch.0]
                 .iter()
-                .filter_map(move |&header| dt.dominates(header, latch).then_some((latch, header)))
+                .filter_map(move |&header| {
+                    dominators
+                        .dominates(header, latch)
+                        .then_some((latch, header))
+                })
         });
 
         let natural_loops = back_edges.map(|(latch, header)| {
@@ -76,7 +80,8 @@ impl LoopForest {
             let loop_header = first[i].header;
 
             let parent = second.iter_mut().find(|other| {
-                dt.dominates(other.header, loop_header) && other.basic_blocks.contains(&loop_header)
+                dominators.dominates(other.header, loop_header)
+                    && other.basic_blocks.contains(&loop_header)
             });
 
             match parent {
@@ -116,6 +121,7 @@ pub struct Loop {
     children: Vec<LoopId>,
 }
 
-pub fn compute_loops(func: &Function, dt: &DominatorTree) -> LoopForest {
-    LoopForest::new(func, dt)
+pub fn compute_loops(func: &Function) -> LoopForest {
+    let dominators = compute_dominators(func);
+    LoopForest::new(func, &dominators)
 }

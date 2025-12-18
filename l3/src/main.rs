@@ -34,7 +34,7 @@ fn main() {
             let mut contexts = create_contexts(func);
             let forests = generate_forests(func, &liveness, &def_use, &mut contexts);
             for forest in &forests {
-                // print!("{}", forest.resolved(&prog.interner));
+                print!("{}", forest.resolved(&prog.interner));
                 greedy_match(forest);
             }
         }

@@ -25,7 +25,9 @@ pub enum OpKind {
     Load,
     Store,
     Return,
+    ReturnValue,
     Branch,
+    BranchCond,
 }
 
 impl fmt::Display for OpKind {
@@ -46,8 +48,8 @@ impl fmt::Display for OpKind {
             Gt => ">",
             Load => "load",
             Store => "store",
-            Return => "ret",
-            Branch => "br",
+            Return | ReturnValue => "ret",
+            Branch | BranchCond => "br",
         };
         write!(f, "{}", op)
     }
@@ -93,7 +95,7 @@ pub struct SelectionForest {
 }
 
 impl SelectionForest {
-    fn new(func: &Function, ctx: &mut Context) -> Self {
+    pub fn new(func: &Function, ctx: &mut Context) -> Self {
         use Instruction::*;
 
         let mut forest = Self {
@@ -104,7 +106,7 @@ impl SelectionForest {
         for &id in &ctx.inst_ids {
             match &func.basic_blocks[ctx.block_id.0].instructions[id] {
                 Assign { dst, src } => {
-                    forest.make_root(OpKind::Assign, [*src], Some(Value::Variable(*dst)))
+                    forest.alloc_tree(OpKind::Assign, [*src], Some(Value::Variable(*dst)))
                 }
                 Binary { dst, lhs, op, rhs } => {
                     let op_kind = match op {
@@ -115,7 +117,7 @@ impl SelectionForest {
                         BinaryOp::Shl => OpKind::Shl,
                         BinaryOp::Shr => OpKind::Shr,
                     };
-                    forest.make_root(op_kind, [*lhs, *rhs], Some(Value::Variable(*dst)))
+                    forest.alloc_tree(op_kind, [*lhs, *rhs], Some(Value::Variable(*dst)))
                 }
                 Compare { dst, lhs, cmp, rhs } => {
                     let cmp_kind = match cmp {
@@ -125,21 +127,21 @@ impl SelectionForest {
                         CompareOp::Ge => OpKind::Ge,
                         CompareOp::Gt => OpKind::Gt,
                     };
-                    forest.make_root(cmp_kind, [*lhs, *rhs], Some(Value::Variable(*dst)))
+                    forest.alloc_tree(cmp_kind, [*lhs, *rhs], Some(Value::Variable(*dst)))
                 }
-                Load { dst, src } => forest.make_root(
+                Load { dst, src } => forest.alloc_tree(
                     OpKind::Load,
                     [Value::Variable(*src)],
                     Some(Value::Variable(*dst)),
                 ),
                 Store { dst, src } => {
-                    forest.make_root(OpKind::Store, [Value::Variable(*dst), *src], None)
+                    forest.alloc_tree(OpKind::Store, [Value::Variable(*dst), *src], None)
                 }
-                Return => forest.make_root(OpKind::Return, [], None),
-                ReturnValue(val) => forest.make_root(OpKind::Return, [*val], None),
-                Branch(label) => forest.make_root(OpKind::Branch, [Value::Label(*label)], None),
+                Return => forest.alloc_tree(OpKind::Return, [], None),
+                ReturnValue(val) => forest.alloc_tree(OpKind::ReturnValue, [*val], None),
+                Branch(label) => forest.alloc_tree(OpKind::Branch, [Value::Label(*label)], None),
                 BranchCond { cond, label } => {
-                    forest.make_root(OpKind::Branch, [*cond, Value::Label(*label)], None)
+                    forest.alloc_tree(OpKind::BranchCond, [*cond, Value::Label(*label)], None)
                 }
                 Label(_) | Call { .. } | CallResult { .. } => {
                     unreachable!("illegal context instruction")
@@ -150,7 +152,7 @@ impl SelectionForest {
         forest
     }
 
-    fn merge(
+    pub fn merge(
         &mut self,
         func: &Function,
         ctx: &mut Context,
@@ -169,13 +171,17 @@ impl SelectionForest {
         }
     }
 
+    pub fn child_of(&self, node: NodeId, index: usize) -> NodeId {
+        self.arena[node].children[index]
+    }
+
     fn alloc(&mut self, node: SFNode) -> NodeId {
         let id = self.arena.len();
         self.arena.push(node);
         id
     }
 
-    fn make_root(
+    fn alloc_tree(
         &mut self,
         kind: OpKind,
         children: impl IntoIterator<Item = Value>,
@@ -212,11 +218,11 @@ impl SelectionForest {
         ctx: &mut Context,
         liveness: &LivenessResult,
         def_use: &DefUseChain,
-        i: usize,
-        j: usize,
+        idx1: usize,
+        idx2: usize,
     ) -> bool {
-        let u = self.roots[i];
-        let v = self.roots[j];
+        let u = self.roots[idx1];
+        let v = self.roots[idx2];
         let node1 = &self.arena[u];
 
         let &NodeKind::Op {
@@ -232,16 +238,16 @@ impl SelectionForest {
         };
 
         let block = &func.basic_blocks[ctx.block_id.0];
-        let inst1 = &block.instructions[ctx.inst_ids[i]];
-        let inst2 = &block.instructions[ctx.inst_ids[j]];
+        let inst1 = &block.instructions[ctx.inst_ids[idx1]];
+        let inst2 = &block.instructions[ctx.inst_ids[idx2]];
 
-        if !liveness.is_dead_at(ctx.block_id, ctx.inst_ids[j], result)
+        if !liveness.is_dead_at(ctx.block_id, ctx.inst_ids[idx2], result)
             || !def_use.is_only_user(inst1, inst2)
         {
             return false;
         }
 
-        for k in i + 1..j {
+        for k in idx1 + 1..idx2 {
             let mid = &block.instructions[ctx.inst_ids[k]];
 
             match inst1 {
@@ -277,8 +283,8 @@ impl SelectionForest {
         }
 
         self.arena[u].parent = Some(leaf_parent);
-        self.roots.remove(i);
-        ctx.inst_ids.remove(i);
+        self.roots.remove(idx1);
+        ctx.inst_ids.remove(idx1);
 
         true
     }
