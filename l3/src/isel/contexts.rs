@@ -1,9 +1,11 @@
 use l3::*;
 
+type InstId = usize;
+
 #[derive(Debug)]
 pub struct Context {
     pub block_id: BlockId,
-    pub inst_ids: Vec<usize>,
+    pub inst_ids: Vec<InstId>,
 }
 
 pub fn create_contexts(func: &Function) -> Vec<Context> {

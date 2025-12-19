@@ -60,8 +60,8 @@ impl CodeGenerator {
                 dfs(&forest, cover.root, cover, &mut l2_instructions);
             }
 
-            for inst in &l2_instructions {
-                writeln!(self.stream, "    {}", inst.resolved(interner))?;
+            for l2_inst in &l2_instructions {
+                writeln!(self.stream, "    {}", l2_inst.resolved(interner))?;
             }
         }
 
