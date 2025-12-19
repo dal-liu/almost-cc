@@ -102,6 +102,7 @@ impl<'a> IntoIterator for &'a BitVector {
     }
 }
 
+#[derive(Debug)]
 pub struct BitVectorIterator<'a> {
     vec: &'a [u64],
     word_index: usize,

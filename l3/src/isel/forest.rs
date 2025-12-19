@@ -95,7 +95,19 @@ pub struct SelectionForest {
 }
 
 impl SelectionForest {
-    pub fn new(func: &Function, ctx: &mut Context) -> Self {
+    pub fn child(&self, id: NodeId, index: usize) -> NodeId {
+        self.arena[id].children[index]
+    }
+
+    pub fn kind(&self, id: NodeId) -> &NodeKind {
+        &self.arena[id].kind
+    }
+
+    pub fn children(&self, id: NodeId) -> impl Iterator<Item = NodeId> {
+        self.arena[id].children.iter().copied()
+    }
+
+    fn new(func: &Function, ctx: &Context) -> Self {
         use Instruction::*;
 
         let mut forest = Self {
@@ -152,7 +164,7 @@ impl SelectionForest {
         forest
     }
 
-    pub fn merge(
+    fn merge(
         &mut self,
         func: &Function,
         ctx: &mut Context,
@@ -169,10 +181,6 @@ impl SelectionForest {
             }
             break;
         }
-    }
-
-    pub fn child_of(&self, node: NodeId, index: usize) -> NodeId {
-        self.arena[node].children[index]
     }
 
     fn alloc(&mut self, node: SFNode) -> NodeId {
@@ -333,18 +341,13 @@ impl DisplayResolved for SelectionForest {
     }
 }
 
-pub fn generate_forests(
+pub fn generate_forest(
     func: &Function,
     liveness: &LivenessResult,
     def_use: &DefUseChain,
-    contexts: &mut [Context],
-) -> Vec<SelectionForest> {
-    contexts
-        .iter_mut()
-        .map(|ctx| {
-            let mut forest = SelectionForest::new(func, ctx);
-            forest.merge(func, ctx, liveness, def_use);
-            forest
-        })
-        .collect()
+    ctx: &mut Context,
+) -> SelectionForest {
+    let mut forest = SelectionForest::new(func, ctx);
+    forest.merge(func, ctx, liveness, def_use);
+    forest
 }

@@ -109,10 +109,3 @@ impl DisplayResolved for InterferenceGraph<'_> {
         writeln!(f, "{}", lines.join("\n"))
     }
 }
-
-pub fn build_interference<'a>(
-    func: &Function,
-    liveness: &'a LivenessResult,
-) -> InterferenceGraph<'a> {
-    InterferenceGraph::new(func, liveness)
-}

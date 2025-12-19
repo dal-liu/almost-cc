@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use l2::*;
 use utils::Interner;
 
-use crate::analysis::{compute_liveness, compute_loops};
+use crate::analysis::{DominatorTree, LoopForest, compute_liveness};
 use crate::regalloc::coloring::{ColoringResult, color_graph};
-use crate::regalloc::interference::build_interference;
+use crate::regalloc::interference::InterferenceGraph;
 use crate::regalloc::spilling::spill;
 
 pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) {
@@ -15,8 +15,9 @@ pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) 
 
     loop {
         let liveness = compute_liveness(func);
-        let mut interference = build_interference(func, &liveness);
-        let loops = compute_loops(func);
+        let mut interference = InterferenceGraph::new(func, &liveness);
+        let dominators = DominatorTree::new(func);
+        let loops = LoopForest::new(func, &dominators);
         let coloring = color_graph(func, &liveness, &mut interference, &loops, &prev_spilled);
 
         if coloring.spill_nodes.is_empty() {

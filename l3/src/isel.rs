@@ -3,5 +3,5 @@ mod forest;
 mod tiling;
 
 pub use contexts::create_contexts;
-pub use forest::generate_forests;
-pub use tiling::greedy_match;
+pub use forest::generate_forest;
+pub use tiling::{cover_forest, isel_tiles};

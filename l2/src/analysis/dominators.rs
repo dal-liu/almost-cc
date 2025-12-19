@@ -95,7 +95,3 @@ impl DominatorTree {
         self.preorder[u.0] <= self.preorder[v.0] && self.postorder[u.0] >= self.postorder[v.0]
     }
 }
-
-pub fn compute_dominators(func: &Function) -> DominatorTree {
-    DominatorTree::new(func)
-}

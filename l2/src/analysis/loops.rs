@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use l2::*;
 use utils::BitVector;
 
-use crate::analysis::dominators::{DominatorTree, compute_dominators};
+use crate::analysis::dominators::DominatorTree;
 
 type LoopId = usize;
 
@@ -69,12 +69,9 @@ impl LoopForest {
         let mut block_map = HashMap::new();
 
         for i in 0..merged_loops.len() {
-            merged_loops
-                .iter()
-                .flat_map(|loop_| &loop_.basic_blocks)
-                .for_each(|&id| {
-                    block_map.entry(id).or_insert(i);
-                });
+            for &id in merged_loops.iter().flat_map(|loop_| &loop_.basic_blocks) {
+                block_map.entry(id).or_insert(i);
+            }
 
             let (first, second) = merged_loops.split_at_mut(i + 1);
             let loop_header = first[i].header;
@@ -119,9 +116,4 @@ pub struct Loop {
     basic_blocks: Vec<BlockId>,
     depth: u32,
     children: Vec<LoopId>,
-}
-
-pub fn compute_loops(func: &Function) -> LoopForest {
-    let dominators = compute_dominators(func);
-    LoopForest::new(func, &dominators)
 }

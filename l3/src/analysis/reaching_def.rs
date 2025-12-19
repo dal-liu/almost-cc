@@ -62,22 +62,22 @@ impl ReachingDefAnalysis {
         let mut block_kill = vec![BitVector::new(num_insts); num_blocks];
 
         for (i, block) in func.basic_blocks.iter().enumerate() {
-            block
-                .instructions
-                .iter()
-                .rev()
-                .filter_map(|inst| inst.defs().and_then(|def| Some((inst, def))))
-                .for_each(|(inst, def)| {
-                    let j = interner[inst];
-                    if !block_kill[i].test(j) {
-                        block_gen[i].set(j);
-                    }
-                    block_kill[i].set_from(
-                        def_table[&def]
-                            .iter()
-                            .filter_map(|&id| (j != id).then_some(id)),
-                    );
-                });
+            for inst in block.instructions.iter().rev() {
+                let Some(def) = inst.defs() else {
+                    continue;
+                };
+
+                let j = interner[inst];
+                if !block_kill[i].test(j) {
+                    block_gen[i].set(j);
+                }
+
+                block_kill[i].set_from(
+                    def_table[&def]
+                        .iter()
+                        .filter_map(|&id| (j != id).then_some(id)),
+                );
+            }
         }
 
         ReachingDefAnalysis {

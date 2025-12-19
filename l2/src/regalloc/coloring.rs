@@ -120,7 +120,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
             .map(|n| (n, n))
             .collect();
 
-        let mut allocator = Self {
+        Self {
             prev_spilled,
             num_defs_uses,
             loop_depths,
@@ -146,19 +146,20 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
             move_list,
             alias,
             color,
-        };
+        }
+    }
 
-        for node in (0..num_nodes).filter(|n| !allocator.precolored.contains(n)) {
-            if allocator.interference.degree(node) >= Register::NUM_GP_REGISTERS {
-                allocator.spill_worklist.set(node);
-            } else if allocator.is_move_related(node) {
-                allocator.freeze_worklist.set(node);
+    fn mk_worklist(&mut self) {
+        let num_nodes = self.interference.interner.len();
+        for node in (0..num_nodes).filter(|n| !self.precolored.contains(n)) {
+            if self.interference.degree(node) >= Register::NUM_GP_REGISTERS {
+                self.spill_worklist.set(node);
+            } else if self.is_move_related(node) {
+                self.freeze_worklist.set(node);
             } else {
-                allocator.simplify_worklist.set(node);
+                self.simplify_worklist.set(node);
             }
         }
-
-        allocator
     }
 
     fn allocate(&mut self) {
@@ -475,6 +476,7 @@ pub fn color_graph<'a, 'b>(
     prev_spilled: &'b HashSet<Value>,
 ) -> ColoringResult {
     let mut allocator = ColoringAllocator::new(func, liveness, interference, loops, prev_spilled);
+    allocator.mk_worklist();
     allocator.allocate();
     allocator.assign_colors()
 }

@@ -10,18 +10,18 @@ struct CodeGenerator {
 }
 
 impl CodeGenerator {
-    pub fn new() -> io::Result<Self> {
+    fn new() -> io::Result<Self> {
         let file = File::create("prog.L1")?;
         Ok(Self {
             stream: BufWriter::new(file),
         })
     }
 
-    pub fn emit_program(&mut self, prog: &Program) -> io::Result<()> {
+    fn emit_program(&mut self, prog: &Program) -> io::Result<()> {
         write!(self.stream, "{}", translate_program(prog))
     }
 
-    pub fn finish(mut self) -> io::Result<()> {
+    fn finish(mut self) -> io::Result<()> {
         self.stream.flush()
     }
 }

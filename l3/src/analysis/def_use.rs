@@ -59,10 +59,3 @@ impl DisplayResolved for DefUseChain<'_> {
         writeln!(f, "{}", lines.join("\n"))
     }
 }
-
-pub fn build_def_use<'a>(
-    func: &'a Function,
-    reaching_def: &'a ReachingDefResult,
-) -> DefUseChain<'a> {
-    DefUseChain::new(func, reaching_def)
-}
