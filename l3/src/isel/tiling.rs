@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use l2;
 use l3::*;
 
-use crate::isel::forest::{NodeKind, OpKind, SFNode, SelectionForest};
+use crate::isel::forest::{NodeId, NodeKind, OpKind, SFNode, SelectionForest};
 
 macro_rules! pat {
     (any) => {
@@ -70,19 +70,17 @@ macro_rules! pat {
     };
 }
 
-type NodeId = usize;
-
 #[derive(Debug, Clone)]
-struct Pattern {
+pub struct Pattern {
     children: Vec<Pattern>,
     matches: fn(&SFNode, &Option<Value>) -> bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct Tile {
-    pattern: Pattern,
-    cost: u32,
-    emit: fn(&SelectionForest, NodeId) -> Vec<l2::Instruction>,
+    pub pattern: Pattern,
+    pub cost: u32,
+    pub emit: fn(&SelectionForest, NodeId) -> Vec<l2::Instruction>,
 }
 
 impl Tile {
@@ -101,7 +99,7 @@ impl Tile {
     fn try_cover(&self, forest: &SelectionForest, id: NodeId) -> Option<Vec<NodeId>> {
         let mut uncovered = Vec::new();
         let NodeKind::Op { result: opt, .. } = forest.kind(id) else {
-            unreachable!("roots should be ops");
+            unreachable!("cover nodes should be ops");
         };
 
         fn dfs(
@@ -146,8 +144,9 @@ impl Tile {
 
 #[derive(Debug)]
 pub struct Cover<'a> {
-    map: HashMap<NodeId, &'a Tile>,
-    cost: u32,
+    pub map: HashMap<NodeId, &'a Tile>,
+    pub cost: u32,
+    pub root: NodeId,
 }
 
 pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cover<'a>> {
@@ -181,7 +180,11 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
             }
 
             if best.as_ref().map_or(true, |b: &Cover| cost < b.cost) {
-                best = Some(Cover { map, cost });
+                best = Some(Cover {
+                    map,
+                    cost,
+                    root: id,
+                });
             }
         }
 

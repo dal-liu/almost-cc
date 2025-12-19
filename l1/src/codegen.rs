@@ -8,14 +8,14 @@ struct CodeGenerator {
 }
 
 impl CodeGenerator {
-    pub fn new() -> io::Result<Self> {
+    fn new() -> io::Result<Self> {
         let file = File::create("prog.S")?;
         Ok(Self {
             stream: BufWriter::new(file),
         })
     }
 
-    pub fn emit_program(&mut self, prog: &Program) -> io::Result<()> {
+    fn emit_program(&mut self, prog: &Program) -> io::Result<()> {
         writeln!(
             self.stream,
             "\t.text\n\
@@ -43,10 +43,6 @@ impl CodeGenerator {
         }
 
         Ok(())
-    }
-
-    pub fn finish(mut self) -> io::Result<()> {
-        self.stream.flush()
     }
 
     fn emit_function(&mut self, func: &Function) -> io::Result<()> {
@@ -303,6 +299,10 @@ impl CodeGenerator {
             RCX => "%cl",
             RSP => panic!("rsp cannot be 8 bit"),
         }
+    }
+
+    fn finish(mut self) -> io::Result<()> {
+        self.stream.flush()
     }
 }
 

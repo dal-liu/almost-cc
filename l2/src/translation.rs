@@ -16,29 +16,28 @@ pub fn translate_program(prog: &Program) -> l1::Program {
 
 fn translate_register(reg: &Value) -> l1::Register {
     use Register::*;
-    use l1::Register as L1;
 
     let Value::Register(reg) = reg else {
         unreachable!("not a register");
     };
 
     match reg {
-        RAX => L1::RAX,
-        RDI => L1::RDI,
-        RSI => L1::RSI,
-        RDX => L1::RDX,
-        R8 => L1::R8,
-        R9 => L1::R9,
-        RCX => L1::RCX,
-        RSP => L1::RSP,
-        R10 => L1::R10,
-        R11 => L1::R11,
-        R12 => L1::R12,
-        R13 => L1::R13,
-        R14 => L1::R14,
-        R15 => L1::R15,
-        RBP => L1::RBP,
-        RBX => L1::RBX,
+        RAX => l1::Register::RAX,
+        RDI => l1::Register::RDI,
+        RSI => l1::Register::RSI,
+        RDX => l1::Register::RDX,
+        R8 => l1::Register::R8,
+        R9 => l1::Register::R9,
+        RCX => l1::Register::RCX,
+        RSP => l1::Register::RSP,
+        R10 => l1::Register::R10,
+        R11 => l1::Register::R11,
+        R12 => l1::Register::R12,
+        R13 => l1::Register::R13,
+        R14 => l1::Register::R14,
+        R15 => l1::Register::R15,
+        RBP => l1::Register::RBP,
+        RBX => l1::Register::RBX,
     }
 }
 

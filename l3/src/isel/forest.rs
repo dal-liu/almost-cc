@@ -6,7 +6,7 @@ use utils::{DisplayResolved, Interner};
 use crate::analysis::{DefUseChain, LivenessResult};
 use crate::isel::contexts::Context;
 
-type NodeId = usize;
+pub type NodeId = usize;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum OpKind {
