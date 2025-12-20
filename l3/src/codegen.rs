@@ -42,7 +42,7 @@ impl CodeGenerator {
             cover: &Cover,
             l2_instructions: &mut Vec<l2::Instruction>,
         ) {
-            for child in forest.children(id) {
+            for &child in &forest.node(id).children {
                 dfs(forest, child, cover, l2_instructions);
             }
 

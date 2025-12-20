@@ -5,6 +5,8 @@ use utils::{BitVector, DisplayResolved, Interner};
 
 use crate::analysis::dataflow::{Dataflow, Direction, solve};
 
+type InstId = usize;
+
 #[derive(Debug)]
 pub struct LivenessResult {
     pub interner: Interner<SymbolId>,
@@ -12,8 +14,8 @@ pub struct LivenessResult {
 }
 
 impl LivenessResult {
-    pub fn is_dead_at(&self, b: BlockId, i: usize, var: SymbolId) -> bool {
-        !self.out[b.0][i].test(self.interner[&var])
+    pub fn is_dead_at(&self, b: BlockId, i: InstId, id: SymbolId) -> bool {
+        !self.out[b.0][i].test(self.interner[&id])
     }
 }
 

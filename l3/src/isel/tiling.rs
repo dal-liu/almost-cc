@@ -3,69 +3,48 @@ use std::collections::HashMap;
 use l2;
 use l3::*;
 
-use crate::isel::forest::{NodeId, NodeKind, OpKind, SFNode, SelectionForest};
+use crate::isel::forest::{NodeId, NodeKind, SFNode, SelectionForest};
 
 macro_rules! pat {
     (any) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, _| {
-                matches!(
-                    &node.kind,
-                    NodeKind::Op {
-                        result: Some(_),
-                        ..
-                    } | NodeKind::Value(_)
-                )
-            },
+            matches: |node, _|  node.result.is_some(),
         }
     };
 
     (exact) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, opt| match &node.kind {
-                NodeKind::Op {
-                    result, ..
-                } => result == opt,
-                NodeKind::Value(val) => matches!(opt, Some(v) if v == val)
-            },
+            matches: |node, res| node.result == res,
         }
     };
 
     ($kind:ident) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, _| matches!(&node.kind, NodeKind::Op { kind: OpKind::$kind, result: None }),
+            matches: |node, _| matches!(&node.kind, NodeKind::$kind) && node.result.is_none(),
         }
     };
 
     ($kind:ident($($child:expr),*)) => {
         Pattern {
             children: vec![$($child),*],
-            matches: |node, _| matches!(&node.kind, NodeKind::Op { kind: OpKind::$kind, result: None }),
+            matches: |node, _| matches!(&node.kind, NodeKind::$kind) && node.result.is_none(),
         }
     };
 
     ($kind:ident($($child:expr),*) -> any) => {
         Pattern {
             children: vec![$($child),*],
-            matches: |node, _| matches!(&node.kind, NodeKind::Op { kind: OpKind::$kind, result: Some(_) }),
+            matches: |node, _| matches!(&node.kind, NodeKind::$kind) && node.result.is_some(),
         }
     };
 
     ($kind:ident($($child:expr),*) -> exact) => {
         Pattern {
             children: vec![$($child),*],
-            matches: |node, opt| {
-                matches!(
-                    &node.kind,
-                    NodeKind::Op {
-                        kind: OpKind::$kind,
-                        result
-                    } if result == opt
-                )
-            },
+            matches: |node, res| matches!(&node.kind, NodeKind::$kind) && node.result == res,
         }
     };
 }
@@ -73,7 +52,7 @@ macro_rules! pat {
 #[derive(Debug, Clone)]
 pub struct Pattern {
     children: Vec<Pattern>,
-    matches: fn(&SFNode, &Option<Value>) -> bool,
+    matches: fn(&SFNode, Option<Value>) -> bool,
 }
 
 #[derive(Debug, Clone)]
@@ -98,31 +77,22 @@ impl Tile {
 
     fn try_cover(&self, forest: &SelectionForest, id: NodeId) -> Option<Vec<NodeId>> {
         let mut uncovered = Vec::new();
-        let NodeKind::Op { result: opt, .. } = forest.kind(id) else {
-            unreachable!("cover nodes should be ops");
-        };
 
         fn dfs(
             forest: &SelectionForest,
             id: NodeId,
-            opt: &Option<Value>,
+            res: Option<Value>,
             pat: &Pattern,
             uncovered: &mut Vec<NodeId>,
         ) -> bool {
-            let node = &forest.arena[id];
+            let node = forest.node(id);
 
-            if !(pat.matches)(node, opt) {
+            if !(pat.matches)(node, res) {
                 return false;
             }
 
             if pat.children.is_empty() {
-                if matches!(
-                    node.kind,
-                    NodeKind::Op {
-                        result: Some(_),
-                        ..
-                    }
-                ) {
+                if node.is_op() && node.result.is_some() {
                     uncovered.push(id);
                 }
                 return true;
@@ -135,10 +105,17 @@ impl Tile {
             node.children
                 .iter()
                 .zip(&pat.children)
-                .all(|(&i, p)| dfs(forest, i, opt, p, uncovered))
+                .all(|(&i, p)| dfs(forest, i, res, p, uncovered))
         }
 
-        dfs(forest, id, opt, &self.pattern, &mut uncovered).then(|| uncovered)
+        dfs(
+            forest,
+            id,
+            forest.node(id).result,
+            &self.pattern,
+            &mut uncovered,
+        )
+        .then(|| uncovered)
     }
 }
 
@@ -156,9 +133,11 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
         tiles: &'a [Tile],
         dp: &mut HashMap<NodeId, Cover<'a>>,
     ) {
-        for child in forest
-            .children(id)
-            .filter(|&child| matches!(forest.kind(child), &NodeKind::Op { .. }))
+        for &child in forest
+            .node(id)
+            .children
+            .iter()
+            .filter(|&&child| forest.node(child).is_op())
         {
             dfs(forest, child, tiles, dp)
         }
@@ -378,14 +357,14 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     let branch = Tile::new(pat!(Branch(pat!(any))), 1, |forest, root| {
-        let NodeKind::Value(Value::Label(label)) = forest.kind(forest.child(root, 0)) else {
+        let Some(Value::Label(label)) = &forest.node(forest.child(root, 0)).result else {
             unreachable!("branch node should have label");
         };
         vec![l2::Instruction::Goto(l2::SymbolId(label.0))]
     });
 
     let branch_cond = Tile::new(pat!(BranchCond(pat!(any), pat!(any))), 1, |forest, root| {
-        let NodeKind::Value(Value::Label(label)) = forest.kind(forest.child(root, 1)) else {
+        let Some(Value::Label(label)) = &forest.node(forest.child(root, 1)).result else {
             unreachable!("branch cond node should have label");
         };
         vec![l2::Instruction::CJump {
@@ -575,18 +554,11 @@ pub fn isel_tiles() -> Vec<Tile> {
 }
 
 fn translate_node(forest: &SelectionForest, id: NodeId) -> l2::Value {
-    match &forest.kind(id) {
-        NodeKind::Op { result, .. } => {
-            let Some(Value::Variable(res)) = result else {
-                unreachable!("op should have a result");
-            };
-            l2::Value::Variable(l2::SymbolId(res.0))
-        }
-        NodeKind::Value(val) => match val {
-            Value::Number(num) => l2::Value::Number(*num),
-            Value::Label(label) => l2::Value::Label(l2::SymbolId(label.0)),
-            Value::Function(callee) => l2::Value::Function(l2::SymbolId(callee.0)),
-            Value::Variable(var) => l2::Value::Variable(l2::SymbolId(var.0)),
-        },
+    match &forest.node(id).result {
+        Some(Value::Number(num)) => l2::Value::Number(*num),
+        Some(Value::Label(label)) => l2::Value::Label(l2::SymbolId(label.0)),
+        Some(Value::Function(callee)) => l2::Value::Function(l2::SymbolId(callee.0)),
+        Some(Value::Variable(var)) => l2::Value::Variable(l2::SymbolId(var.0)),
+        None => unreachable!("nodes should have values"),
     }
 }
