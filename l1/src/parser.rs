@@ -7,20 +7,20 @@ use l1::*;
 type MyExtra<'src> = extra::Err<Rich<'src, char>>;
 
 pub fn parse_file(file_name: &str) -> Option<Program> {
-    let file_name = file_name.to_string();
+    let file_name = file_name.to_owned();
     let input = fs::read_to_string(&file_name).unwrap_or_else(|e| panic!("{}", e));
     let (output, errors) = program().parse(&input).into_output_errors();
 
-    errors.into_iter().for_each(|err| {
+    errors.into_iter().for_each(|e| {
         Report::build(
             ReportKind::Error,
-            (file_name.clone(), err.span().into_range()),
+            (file_name.clone(), e.span().into_range()),
         )
         .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
-        .with_message(err.to_string())
+        .with_message(e.to_string())
         .with_label(
-            Label::new((file_name.clone(), err.span().into_range()))
-                .with_message(err.reason().to_string())
+            Label::new((file_name.clone(), e.span().into_range()))
+                .with_message(e.reason().to_string())
                 .with_color(Color::Red),
         )
         .finish()
@@ -76,8 +76,8 @@ fn rcx<'src>() -> impl Parser<'src, &'src str, Register, MyExtra<'src>> {
 fn value<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     choice((
         register_or_number(),
-        function_name().map(|callee| Value::Function(callee.to_string())),
-        label_name().map(|label| Value::Label(label.to_string())),
+        function_name().map(|callee| Value::Function(callee.to_owned())),
+        label_name().map(|label| Value::Label(label.to_owned())),
     ))
     .padded_by(separators())
 }
@@ -92,7 +92,7 @@ fn register_or_number<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'sr
 fn write_or_function<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     write_register()
         .map(Value::Register)
-        .or(function_name().map(|callee| Value::Function(callee.to_string())))
+        .or(function_name().map(|callee| Value::Function(callee.to_owned())))
         .padded_by(separators())
 }
 
@@ -243,15 +243,15 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
             lhs,
             cmp,
             rhs,
-            label: label.to_string(),
+            label: label.to_owned(),
         });
 
-    let label_inst = label_name().map(|label| Instruction::Label(label.to_string()));
+    let label_inst = label_name().map(|label| Instruction::Label(label.to_owned()));
 
     let goto = just("goto")
         .padded_by(separators())
         .ignore_then(label_name())
-        .map(|label| Instruction::Goto(label.to_string()));
+        .map(|label| Instruction::Goto(label.to_owned()));
 
     let return_inst = just("return")
         .padded_by(separators())
@@ -359,7 +359,7 @@ fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
         )
         .then_ignore(just(')').padded_by(comment().repeated()).padded())
         .map(|(((name, args), locals), instructions)| Function {
-            name: name.to_string(),
+            name: name.to_owned(),
             args,
             locals,
             instructions,
@@ -379,7 +379,7 @@ fn program<'src>() -> impl Parser<'src, &'src str, Program, MyExtra<'src>> {
                 .then(any().repeated()),
         )
         .map(|(entry_point, functions)| Program {
-            entry_point: entry_point.to_string(),
+            entry_point: entry_point.to_owned(),
             functions,
         })
 }

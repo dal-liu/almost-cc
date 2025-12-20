@@ -29,12 +29,10 @@ fn main() {
             print!("{}", &prog);
         }
 
-        for func in &mut prog.functions {
-            mangle_labels(func);
-        }
+        let (prefix, mut suffix) = mangle_labels(&mut prog);
 
         if cli.generate == 1 {
-            generate_code(&prog).unwrap();
+            generate_code(&mut prog, &prefix, &mut suffix).unwrap();
         }
     }
 }

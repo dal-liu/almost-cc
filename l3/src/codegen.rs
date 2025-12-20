@@ -35,17 +35,28 @@ impl CodeGenerator {
         })
     }
 
-    fn emit_program(&mut self, prog: &Program) -> io::Result<()> {
+    fn emit_program(
+        &mut self,
+        prog: &mut Program,
+        prefix: &str,
+        suffix: &mut u32,
+    ) -> io::Result<()> {
         writeln!(self.stream, "(@main")?;
 
         for func in &prog.functions {
-            self.emit_function(func, &prog.interner)?;
+            self.emit_function(func, &mut prog.interner, prefix, suffix)?;
         }
 
         writeln!(self.stream, ")")
     }
 
-    fn emit_function(&mut self, func: &Function, interner: &Interner<String>) -> io::Result<()> {
+    fn emit_function(
+        &mut self,
+        func: &Function,
+        interner: &mut Interner<String>,
+        prefix: &str,
+        suffix: &mut u32,
+    ) -> io::Result<()> {
         let num_params = func.params.len();
         let num_arg_registers = ARG_REGISTERS.len();
 
@@ -117,7 +128,7 @@ impl CodeGenerator {
             }
 
             if let Some(term) = ctx.terminator {
-                self.emit_instruction(term, interner)?;
+                self.emit_instruction(term, interner, prefix, suffix)?;
             }
         }
 
@@ -127,7 +138,9 @@ impl CodeGenerator {
     fn emit_instruction(
         &mut self,
         inst: &Instruction,
-        interner: &Interner<String>,
+        interner: &mut Interner<String>,
+        prefix: &str,
+        suffix: &mut u32,
     ) -> io::Result<()> {
         let mut emit_call = |callee: &Callee, args: &[Value]| {
             let num_args = args.len();
@@ -158,10 +171,6 @@ impl CodeGenerator {
                 )?;
             }
 
-            if !callee.is_libcall() {
-                todo!("store label");
-            }
-
             let l2_inst = match callee {
                 Callee::Value(val) => l2::Instruction::Call {
                     callee: translate_value(val),
@@ -173,10 +182,31 @@ impl CodeGenerator {
                 Callee::TupleError => l2::Instruction::TupleError,
                 Callee::TensorError => l2::Instruction::TensorError(num_args as u8),
             };
-            writeln!(self.stream, "    {}", l2_inst.resolved(interner))?;
 
             if !callee.is_libcall() {
-                todo!("emit label")
+                let l2_id = l2::SymbolId(interner.intern(format!("{}{}", prefix, suffix)));
+                *suffix += 1;
+
+                writeln!(
+                    self.stream,
+                    "    {}",
+                    l2::Instruction::Store {
+                        dst: l2::Value::Register(l2::Register::RSP),
+                        offset: -8,
+                        src: l2::Value::Label(l2_id)
+                    }
+                    .resolved(interner)
+                )?;
+
+                writeln!(self.stream, "    {}", l2_inst.resolved(interner))?;
+
+                writeln!(
+                    self.stream,
+                    "    {}",
+                    l2::Instruction::Label(l2_id).resolved(interner)
+                )?;
+            } else {
+                writeln!(self.stream, "    {}", l2_inst.resolved(interner))?;
             }
 
             Ok(())
@@ -211,8 +241,8 @@ impl CodeGenerator {
     }
 }
 
-pub fn generate_code(prog: &Program) -> io::Result<()> {
+pub fn generate_code(prog: &mut Program, prefix: &str, suffix: &mut u32) -> io::Result<()> {
     let mut code_generator = CodeGenerator::new()?;
-    code_generator.emit_program(&prog)?;
+    code_generator.emit_program(prog, prefix, suffix)?;
     code_generator.finish()
 }

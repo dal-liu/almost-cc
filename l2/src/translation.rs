@@ -45,8 +45,8 @@ fn translate_value(val: &Value, interner: &Interner<String>) -> l1::Value {
     match val {
         Value::Register(_) => l1::Value::Register(translate_register(val)),
         Value::Number(num) => l1::Value::Number(*num),
-        Value::Label(label) => l1::Value::Label(interner.resolve(label.0).to_string()),
-        Value::Function(callee) => l1::Value::Function(interner.resolve(callee.0).to_string()),
+        Value::Label(label) => l1::Value::Label(interner.resolve(label.0).clone()),
+        Value::Function(callee) => l1::Value::Function(interner.resolve(callee.0).clone()),
         Value::Variable(_) => unreachable!("variables should not exist"),
     }
 }
@@ -165,11 +165,11 @@ fn translate_instruction(
                 lhs: translate_value(lhs, interner),
                 cmp: l1_cmp,
                 rhs: translate_value(rhs, interner),
-                label: interner.resolve(label.0).to_string(),
+                label: interner.resolve(label.0).clone(),
             }
         }
-        Label(label) => l1::Instruction::Label(interner.resolve(label.0).to_string()),
-        Goto(label) => l1::Instruction::Goto(interner.resolve(label.0).to_string()),
+        Label(label) => l1::Instruction::Label(interner.resolve(label.0).clone()),
+        Goto(label) => l1::Instruction::Goto(interner.resolve(label.0).clone()),
         Return => l1::Instruction::Return,
         Call { callee, args } => l1::Instruction::Call {
             callee: translate_value(callee, interner),
@@ -208,7 +208,7 @@ fn translate_function(func: &Function, interner: &Interner<String>) -> l1::Funct
         })
         .collect();
     l1::Function {
-        name: interner.resolve(func.name.0).to_string(),
+        name: interner.resolve(func.name.0).clone(),
         args: func.args,
         locals: func.locals,
         instructions: l1_instructions,

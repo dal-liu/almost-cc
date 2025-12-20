@@ -368,7 +368,7 @@ pub fn isel_tiles() -> Vec<Tile> {
             unreachable!("branch cond node should have label");
         };
         vec![l2::Instruction::CJump {
-            lhs: translate_node(forest, forest.child(root, 1)),
+            lhs: translate_node(forest, forest.child(root, 0)),
             cmp: l2::CompareOp::Eq,
             rhs: l2::Value::Number(1),
             label: l2::SymbolId(label.0),

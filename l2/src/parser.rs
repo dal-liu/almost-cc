@@ -9,7 +9,7 @@ use utils::Interner;
 type MyExtra<'src> = extra::Full<Rich<'src, char>, extra::SimpleState<Interner<String>>, ()>;
 
 pub fn parse_file(file_name: &str) -> Option<Program> {
-    let file_name = file_name.to_string();
+    let file_name = file_name.to_owned();
     let input = fs::read_to_string(&file_name).unwrap_or_else(|e| panic!("{}", e));
 
     let (output, errors) = program()
@@ -66,7 +66,7 @@ fn rcx_or_variable<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>>
     just("rcx")
         .to(Value::Register(Register::RCX))
         .or(variable_name()
-            .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_string())))))
+            .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_owned())))))
         .padded_by(separators())
 }
 
@@ -74,9 +74,9 @@ fn value<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     choice((
         register_variable_number(),
         function_name()
-            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_string())))),
+            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_owned())))),
         label_name()
-            .map_with(|label, e| Value::Label(SymbolId(e.state().intern(label.to_string())))),
+            .map_with(|label, e| Value::Label(SymbolId(e.state().intern(label.to_owned())))),
     ))
     .padded_by(separators())
 }
@@ -90,7 +90,7 @@ fn register_variable_number<'src>() -> impl Parser<'src, &'src str, Value, MyExt
 fn write_or_function<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     write_value()
         .or(function_name()
-            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_string())))))
+            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_owned())))))
         .padded_by(separators())
 }
 
@@ -252,16 +252,16 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
             lhs,
             cmp,
             rhs,
-            label: SymbolId(e.state().intern(label.to_string())),
+            label: SymbolId(e.state().intern(label.to_owned())),
         });
 
     let label_inst = label_name()
-        .map_with(|label, e| Instruction::Label(SymbolId(e.state().intern(label.to_string()))));
+        .map_with(|label, e| Instruction::Label(SymbolId(e.state().intern(label.to_owned()))));
 
     let goto = just("goto")
         .padded_by(separators())
         .ignore_then(label_name())
-        .map_with(|label, e| Instruction::Goto(SymbolId(e.state().intern(label.to_string()))));
+        .map_with(|label, e| Instruction::Goto(SymbolId(e.state().intern(label.to_owned()))));
 
     let return_ = just("return")
         .padded_by(separators())
@@ -370,7 +370,7 @@ fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
         .then_ignore(just(')').padded_by(comment().repeated()).padded())
         .map_with(|((name, args), instructions), e| {
             Function::new(
-                SymbolId(e.state().intern(name.to_string())),
+                SymbolId(e.state().intern(name.to_owned())),
                 args,
                 instructions,
             )
@@ -390,7 +390,7 @@ fn program<'src>() -> impl Parser<'src, &'src str, Program, MyExtra<'src>> {
                 .then(any().repeated()),
         )
         .map_with(|(entry_point, functions), e| Program {
-            entry_point: entry_point.to_string(),
+            entry_point: entry_point.to_owned(),
             functions,
             interner: mem::take(e.state()),
         })

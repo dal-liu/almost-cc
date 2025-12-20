@@ -9,7 +9,7 @@ use utils::Interner;
 type MyExtra<'src> = extra::Full<Rich<'src, char>, extra::SimpleState<Interner<String>>, ()>;
 
 pub fn parse_file(file_name: &str) -> Option<Program> {
-    let file_name = file_name.to_string();
+    let file_name = file_name.to_owned();
     let input = fs::read_to_string(&file_name).unwrap_or_else(|e| panic!("{}", e));
 
     let (output, errors) = program()
@@ -58,7 +58,7 @@ fn callee<'src>() -> impl Parser<'src, &'src str, Callee, MyExtra<'src>> {
 
 fn variables<'src>() -> impl Parser<'src, &'src str, Vec<SymbolId>, MyExtra<'src>> {
     variable_name()
-        .map_with(|name, e| SymbolId(e.state().intern(name.to_string())))
+        .map_with(|name, e| SymbolId(e.state().intern(name.to_owned())))
         .separated_by(just(','))
         .collect::<Vec<SymbolId>>()
         .padded_by(separators())
@@ -75,25 +75,25 @@ fn value<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     choice((
         variable_or_number(),
         label_name()
-            .map_with(|label, e| Value::Label(SymbolId(e.state().intern(label.to_string())))),
+            .map_with(|label, e| Value::Label(SymbolId(e.state().intern(label.to_owned())))),
         function_name()
-            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_string())))),
+            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_owned())))),
     ))
     .padded_by(separators())
 }
 
 fn variable_or_number<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     variable_name()
-        .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_string()))))
+        .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_owned()))))
         .or(number().map(Value::Number))
         .padded_by(separators())
 }
 
 fn variable_or_function<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     variable_name()
-        .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_string()))))
+        .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_owned()))))
         .or(function_name()
-            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_string())))))
+            .map_with(|callee, e| Value::Function(SymbolId(e.state().intern(callee.to_owned())))))
         .padded_by(separators())
 }
 
@@ -159,7 +159,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .then_ignore(arrow)
         .then(value())
         .map_with(|(dst, src), e| Instruction::Assign {
-            dst: SymbolId(e.state().intern(dst.to_string())),
+            dst: SymbolId(e.state().intern(dst.to_owned())),
             src,
         });
 
@@ -169,7 +169,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .then(binary_op())
         .then(variable_or_number())
         .map_with(|(((dst, lhs), op), rhs), e| Instruction::Binary {
-            dst: SymbolId(e.state().intern(dst.to_string())),
+            dst: SymbolId(e.state().intern(dst.to_owned())),
             lhs,
             op,
             rhs,
@@ -181,7 +181,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .then(compare_op())
         .then(variable_or_number())
         .map_with(|(((dst, lhs), cmp), rhs), e| Instruction::Compare {
-            dst: SymbolId(e.state().intern(dst.to_string())),
+            dst: SymbolId(e.state().intern(dst.to_owned())),
             lhs,
             cmp,
             rhs,
@@ -192,8 +192,8 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .then_ignore(just("load").padded_by(separators()))
         .then(variable_name())
         .map_with(|(dst, src), e| Instruction::Load {
-            dst: SymbolId(e.state().intern(dst.to_string())),
-            src: SymbolId(e.state().intern(src.to_string())),
+            dst: SymbolId(e.state().intern(dst.to_owned())),
+            src: SymbolId(e.state().intern(src.to_owned())),
         });
 
     let store = just("store")
@@ -202,7 +202,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .then_ignore(arrow)
         .then(value())
         .map_with(|(dst, src), e| Instruction::Store {
-            dst: SymbolId(e.state().intern(dst.to_string())),
+            dst: SymbolId(e.state().intern(dst.to_owned())),
             src,
         });
 
@@ -213,11 +213,11 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .map(Instruction::ReturnValue);
 
     let label_inst = label_name()
-        .map_with(|label, e| Instruction::Label(SymbolId(e.state().intern(label.to_string()))));
+        .map_with(|label, e| Instruction::Label(SymbolId(e.state().intern(label.to_owned()))));
 
-    let branch =
-        br_keyword.ignore_then(label_name().map_with(|label, e| {
-            Instruction::Branch(SymbolId(e.state().intern(label.to_string())))
+    let branch = br_keyword
+        .ignore_then(label_name().map_with(|label, e| {
+            Instruction::Branch(SymbolId(e.state().intern(label.to_owned())))
         }));
 
     let branch_cond = br_keyword
@@ -225,7 +225,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .then(label_name())
         .map_with(|(cond, label), e| Instruction::BranchCond {
             cond,
-            label: SymbolId(e.state().intern(label.to_string())),
+            label: SymbolId(e.state().intern(label.to_owned())),
         });
 
     let call_inst = call_keyword
@@ -242,7 +242,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         .then(arguments())
         .then_ignore(just(')').padded_by(separators()))
         .map_with(|((res, callee), args), e| Instruction::CallResult {
-            dst: SymbolId(e.state().intern(res.to_string())),
+            dst: SymbolId(e.state().intern(res.to_owned())),
             callee,
             args,
         });
@@ -282,7 +282,7 @@ fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
         .then_ignore(just('}').padded_by(comment().repeated()).padded())
         .map_with(|((name, params), instructions), e| {
             Function::new(
-                SymbolId(e.state().intern(name.to_string())),
+                SymbolId(e.state().intern(name.to_owned())),
                 params,
                 instructions,
             )
