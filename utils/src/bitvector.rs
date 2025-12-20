@@ -15,10 +15,10 @@ impl BitVector {
         }
     }
 
-    pub fn test(&self, index: usize) -> bool {
-        assert!(index < self.len);
-        let word_index = index / Self::BITWORD_SIZE;
-        let bit_index = index % Self::BITWORD_SIZE;
+    pub fn test(&self, idx: usize) -> bool {
+        assert!(idx < self.len);
+        let word_index = idx / Self::BITWORD_SIZE;
+        let bit_index = idx % Self::BITWORD_SIZE;
         (self.vec[word_index] & 1u64 << bit_index) != 0
     }
 
@@ -51,17 +51,17 @@ impl BitVector {
         }
     }
 
-    pub fn set(&mut self, index: usize) {
-        assert!(index < self.len);
-        let word_index = index / Self::BITWORD_SIZE;
-        let bit_index = index % Self::BITWORD_SIZE;
+    pub fn set(&mut self, idx: usize) {
+        assert!(idx < self.len);
+        let word_index = idx / Self::BITWORD_SIZE;
+        let bit_index = idx % Self::BITWORD_SIZE;
         self.vec[word_index] |= 1u64 << bit_index;
     }
 
-    pub fn reset(&mut self, index: usize) {
-        assert!(index < self.len);
-        let word_index = index / Self::BITWORD_SIZE;
-        let bit_index = index % Self::BITWORD_SIZE;
+    pub fn reset(&mut self, idx: usize) {
+        assert!(idx < self.len);
+        let word_index = idx / Self::BITWORD_SIZE;
+        let bit_index = idx % Self::BITWORD_SIZE;
         self.vec[word_index] &= !(1u64 << bit_index);
     }
 
@@ -75,8 +75,8 @@ impl BitVector {
         }
     }
 
-    pub fn count(&self) -> u32 {
-        self.vec.iter().map(|word| word.count_ones()).sum()
+    pub fn count(&self) -> usize {
+        self.vec.iter().map(|word| word.count_ones() as usize).sum()
     }
 
     pub fn intersection(&mut self, other: &Self) {

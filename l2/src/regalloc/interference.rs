@@ -5,6 +5,8 @@ use utils::{BitVector, DisplayResolved, Interner};
 
 use crate::analysis::LivenessResult;
 
+type NodeId = usize;
+
 #[derive(Debug)]
 pub struct InterferenceGraph<'a> {
     pub graph: Vec<BitVector>,
@@ -19,7 +21,7 @@ impl<'a> InterferenceGraph<'a> {
             interner: &liveness.interner,
         };
 
-        let gp_registers: Vec<usize> = Register::gp_registers()
+        let gp_registers: Vec<NodeId> = Register::gp_registers()
             .iter()
             .map(|&reg| liveness.interner[&Value::Register(reg)])
             .collect();
@@ -51,7 +53,7 @@ impl<'a> InterferenceGraph<'a> {
                     _ => (),
                 }
 
-                let defs: Vec<usize> = inst
+                let defs: Vec<NodeId> = inst
                     .defs()
                     .iter()
                     .map(|def| liveness.interner[def])
@@ -74,17 +76,17 @@ impl<'a> InterferenceGraph<'a> {
         graph
     }
 
-    pub fn add_edge(&mut self, u: usize, v: usize) {
+    pub fn add_edge(&mut self, u: NodeId, v: NodeId) {
         self.graph[u].set(v);
         self.graph[v].set(u);
     }
 
-    pub fn has_edge(&self, u: usize, v: usize) -> bool {
+    pub fn has_edge(&self, u: NodeId, v: NodeId) -> bool {
         self.graph[u].test(v)
     }
 
-    pub fn degree(&self, node: usize) -> u32 {
-        self.graph[node].count()
+    pub fn degree(&self, id: NodeId) -> NodeId {
+        self.graph[id].count()
     }
 }
 

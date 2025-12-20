@@ -99,8 +99,8 @@ impl SelectionForest {
         &self.arena[id.0]
     }
 
-    pub fn child(&self, id: NodeId, index: usize) -> NodeId {
-        self.node(id).children[index]
+    pub fn child(&self, id: NodeId, idx: usize) -> NodeId {
+        self.node(id).children[idx]
     }
 
     fn new(func: &Function, ctx: &Context) -> Self {
@@ -114,7 +114,7 @@ impl SelectionForest {
         for &id in &ctx.inst_ids {
             match &func.basic_blocks[ctx.block_id.0].instructions[id] {
                 Assign { dst, src } => {
-                    forest.alloc_tree(NodeKind::Assign, [*src], Some(Value::Variable(*dst)))
+                    forest.alloc_tree(NodeKind::Assign, [src], Some(Value::Variable(*dst)))
                 }
                 Binary { dst, lhs, op, rhs } => {
                     let op = match op {
@@ -125,7 +125,7 @@ impl SelectionForest {
                         BinaryOp::Shl => NodeKind::Shl,
                         BinaryOp::Shr => NodeKind::Shr,
                     };
-                    forest.alloc_tree(op, [*lhs, *rhs], Some(Value::Variable(*dst)))
+                    forest.alloc_tree(op, [lhs, rhs], Some(Value::Variable(*dst)))
                 }
                 Compare { dst, lhs, cmp, rhs } => {
                     let cmp = match cmp {
@@ -135,21 +135,21 @@ impl SelectionForest {
                         CompareOp::Ge => NodeKind::Ge,
                         CompareOp::Gt => NodeKind::Gt,
                     };
-                    forest.alloc_tree(cmp, [*lhs, *rhs], Some(Value::Variable(*dst)))
+                    forest.alloc_tree(cmp, [lhs, rhs], Some(Value::Variable(*dst)))
                 }
                 Load { dst, src } => forest.alloc_tree(
                     NodeKind::Load,
-                    [Value::Variable(*src)],
+                    [&Value::Variable(*src)],
                     Some(Value::Variable(*dst)),
                 ),
                 Store { dst, src } => {
-                    forest.alloc_tree(NodeKind::Store, [Value::Variable(*dst), *src], None)
+                    forest.alloc_tree(NodeKind::Store, [&Value::Variable(*dst), src], None)
                 }
                 Return => forest.alloc_tree(NodeKind::Return, [], None),
-                ReturnValue(val) => forest.alloc_tree(NodeKind::ReturnValue, [*val], None),
-                Branch(label) => forest.alloc_tree(NodeKind::Branch, [Value::Label(*label)], None),
+                ReturnValue(val) => forest.alloc_tree(NodeKind::ReturnValue, [val], None),
+                Branch(label) => forest.alloc_tree(NodeKind::Branch, [&Value::Label(*label)], None),
                 BranchCond { cond, label } => {
-                    forest.alloc_tree(NodeKind::BranchCond, [*cond, Value::Label(*label)], None)
+                    forest.alloc_tree(NodeKind::BranchCond, [cond, &Value::Label(*label)], None)
                 }
                 Label(_) | Call { .. } | CallResult { .. } => {
                     unreachable!("illegal context instruction")
@@ -160,16 +160,17 @@ impl SelectionForest {
         forest
     }
 
-    fn alloc_tree(
+    fn alloc_tree<'a>(
         &mut self,
         kind: NodeKind,
-        children: impl IntoIterator<Item = Value>,
+        children: impl IntoIterator<Item = &'a Value>,
         result: Option<Value>,
     ) {
         let children: Vec<NodeId> = children
             .into_iter()
+            .copied()
             .map(|val| {
-                let kind = match &val {
+                let kind = match val {
                     Value::Number(_) => NodeKind::Number,
                     Value::Label(_) => NodeKind::Label,
                     Value::Function(_) => NodeKind::Function,
@@ -208,14 +209,15 @@ impl SelectionForest {
     fn merge_trees(
         &mut self,
         func: &Function,
-        ctx: &mut Context,
+        ctx: &Context,
         liveness: &LivenessResult,
         def_use: &DefUseChain,
     ) {
+        let mut ctx_clone = ctx.clone();
         'outer: loop {
-            for i in 0..self.roots.len() - 1 {
+            for i in 0..self.roots.len().saturating_sub(1) {
                 for j in i + 1..self.roots.len() {
-                    if self.try_merge(func, ctx, liveness, def_use, i, j) {
+                    if self.try_merge(func, &mut ctx_clone, liveness, def_use, i, j) {
                         continue 'outer;
                     }
                 }
@@ -341,7 +343,7 @@ pub fn generate_forest(
     func: &Function,
     liveness: &LivenessResult,
     def_use: &DefUseChain,
-    ctx: &mut Context,
+    ctx: &Context,
 ) -> SelectionForest {
     let mut forest = SelectionForest::new(func, ctx);
     forest.merge_trees(func, ctx, liveness, def_use);

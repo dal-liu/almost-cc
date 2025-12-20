@@ -4,6 +4,7 @@ use l2;
 use l3::*;
 
 use crate::isel::forest::{NodeId, NodeKind, SFNode, SelectionForest};
+use crate::translation::translate_value;
 
 macro_rules! pat {
     (any) => {
@@ -150,8 +151,7 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
             };
 
             let mut cost = tile.cost;
-            let mut map = HashMap::new();
-            map.insert(id, tile);
+            let mut map = HashMap::from([(id, tile)]);
 
             for child in &uncovered {
                 cost += dp[child].cost;
@@ -555,10 +555,7 @@ pub fn isel_tiles() -> Vec<Tile> {
 
 fn translate_node(forest: &SelectionForest, id: NodeId) -> l2::Value {
     match &forest.node(id).result {
-        Some(Value::Number(num)) => l2::Value::Number(*num),
-        Some(Value::Label(label)) => l2::Value::Label(l2::SymbolId(label.0)),
-        Some(Value::Function(callee)) => l2::Value::Function(l2::SymbolId(callee.0)),
-        Some(Value::Variable(var)) => l2::Value::Variable(l2::SymbolId(var.0)),
+        Some(val) => translate_value(val),
         None => unreachable!("nodes should have values"),
     }
 }

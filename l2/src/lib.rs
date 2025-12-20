@@ -24,8 +24,6 @@ pub enum Register {
 }
 
 impl Register {
-    pub const NUM_GP_REGISTERS: u32 = 15;
-
     pub const CALLER_SAVED: &[Register] = &[
         Register::RAX,
         Register::RDI,
@@ -49,6 +47,10 @@ impl Register {
 
     pub fn gp_registers() -> Vec<Register> {
         [Self::CALLER_SAVED, Self::CALLEE_SAVED].concat()
+    }
+
+    pub fn num_gp_registers() -> usize {
+        Self::CALLER_SAVED.len() + Self::CALLEE_SAVED.len()
     }
 }
 

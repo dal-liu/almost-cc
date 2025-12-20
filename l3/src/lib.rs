@@ -15,6 +15,12 @@ pub enum Callee {
     TensorError,
 }
 
+impl Callee {
+    pub fn is_libcall(&self) -> bool {
+        !matches!(self, Callee::Value(_))
+    }
+}
+
 impl DisplayResolved for Callee {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         match self {
