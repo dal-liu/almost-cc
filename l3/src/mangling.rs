@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use l3::*;
 
 pub fn mangle_labels(prog: &mut Program) -> (String, u32) {
@@ -22,20 +24,27 @@ pub fn mangle_labels(prog: &mut Program) -> (String, u32) {
         .unwrap_or("".to_owned());
     prefix.push_str("_global_");
 
-    let suffix = prog
-        .functions
-        .iter_mut()
-        .flat_map(|func| &mut func.basic_blocks)
-        .flat_map(|block| &mut block.instructions)
-        .fold(0, |suffix, inst| match inst {
-            Instruction::Label(label)
-            | Instruction::Branch(label)
-            | Instruction::BranchCond { label, .. } => {
-                *label = SymbolId(prog.interner.intern(format!("{}{}", prefix, suffix)));
-                suffix + 1
+    let mut suffix = 0;
+    for func in &mut prog.functions {
+        let mut label_to_mangled = HashMap::new();
+
+        for block in &mut func.basic_blocks {
+            for inst in &mut block.instructions {
+                match inst {
+                    Instruction::Label(label)
+                    | Instruction::Branch(label)
+                    | Instruction::BranchCond { label, .. } => {
+                        let is_new = !label_to_mangled.contains_key(label);
+                        *label = *label_to_mangled.entry(*label).or_insert_with(|| {
+                            SymbolId(prog.interner.intern(format!("{}{}", prefix, suffix)))
+                        });
+                        suffix += is_new as u32;
+                    }
+                    _ => (),
+                }
             }
-            _ => suffix,
-        });
+        }
+    }
 
     (prefix, suffix)
 }

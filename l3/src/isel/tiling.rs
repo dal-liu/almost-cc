@@ -21,6 +21,13 @@ macro_rules! pat {
         }
     };
 
+    (not) => {
+        Pattern {
+            children: Vec::new(),
+            matches: |node, res| node.result != res,
+        }
+    };
+
     ($kind:ident) => {
         Pattern {
             children: Vec::new(),
@@ -204,20 +211,24 @@ pub fn isel_tiles() -> Vec<Tile> {
         ]
     });
 
-    let assign_sub = Tile::new(pat!(Sub(pat!(any), pat!(any)) -> any), 2, |forest, root| {
-        let dst = translate_node(forest, root);
-        vec![
-            l2::Instruction::Assign {
-                dst,
-                src: translate_node(forest, forest.child(root, 0)),
-            },
-            l2::Instruction::Arithmetic {
-                dst,
-                aop: l2::ArithmeticOp::SubAssign,
-                src: translate_node(forest, forest.child(root, 1)),
-            },
-        ]
-    });
+    let assign_sub = Tile::new(
+        pat!(Sub(pat!(any), pat!(not)) -> exact),
+        2,
+        |forest, root| {
+            let dst = translate_node(forest, root);
+            vec![
+                l2::Instruction::Assign {
+                    dst,
+                    src: translate_node(forest, forest.child(root, 0)),
+                },
+                l2::Instruction::Arithmetic {
+                    dst,
+                    aop: l2::ArithmeticOp::SubAssign,
+                    src: translate_node(forest, forest.child(root, 1)),
+                },
+            ]
+        },
+    );
 
     let assign_mul = Tile::new(pat!(Mul(pat!(any), pat!(any)) -> any), 2, |forest, root| {
         let dst = translate_node(forest, root);
@@ -253,35 +264,43 @@ pub fn isel_tiles() -> Vec<Tile> {
         },
     );
 
-    let assign_shl = Tile::new(pat!(Shl(pat!(any), pat!(any)) -> any), 2, |forest, root| {
-        let dst = translate_node(forest, root);
-        vec![
-            l2::Instruction::Assign {
-                dst,
-                src: translate_node(forest, forest.child(root, 0)),
-            },
-            l2::Instruction::Shift {
-                dst,
-                sop: l2::ShiftOp::ShlAssign,
-                src: translate_node(forest, forest.child(root, 1)),
-            },
-        ]
-    });
+    let assign_shl = Tile::new(
+        pat!(Shl(pat!(any), pat!(not)) -> exact),
+        2,
+        |forest, root| {
+            let dst = translate_node(forest, root);
+            vec![
+                l2::Instruction::Assign {
+                    dst,
+                    src: translate_node(forest, forest.child(root, 0)),
+                },
+                l2::Instruction::Shift {
+                    dst,
+                    sop: l2::ShiftOp::ShlAssign,
+                    src: translate_node(forest, forest.child(root, 1)),
+                },
+            ]
+        },
+    );
 
-    let assign_shr = Tile::new(pat!(Shr(pat!(any), pat!(any)) -> any), 2, |forest, root| {
-        let dst = translate_node(forest, root);
-        vec![
-            l2::Instruction::Assign {
-                dst,
-                src: translate_node(forest, forest.child(root, 0)),
-            },
-            l2::Instruction::Shift {
-                dst,
-                sop: l2::ShiftOp::ShrAssign,
-                src: translate_node(forest, forest.child(root, 1)),
-            },
-        ]
-    });
+    let assign_shr = Tile::new(
+        pat!(Shr(pat!(any), pat!(not)) -> exact),
+        2,
+        |forest, root| {
+            let dst = translate_node(forest, root);
+            vec![
+                l2::Instruction::Assign {
+                    dst,
+                    src: translate_node(forest, forest.child(root, 0)),
+                },
+                l2::Instruction::Shift {
+                    dst,
+                    sop: l2::ShiftOp::ShrAssign,
+                    src: translate_node(forest, forest.child(root, 1)),
+                },
+            ]
+        },
+    );
 
     let lt = Tile::new(pat!(Lt(pat!(any), pat!(any)) -> any), 1, |forest, root| {
         vec![l2::Instruction::Compare {
@@ -413,13 +432,21 @@ pub fn isel_tiles() -> Vec<Tile> {
 
     let sub_right = Tile::new(
         pat!(Sub(pat!(any), pat!(exact)) -> exact),
-        1,
+        2,
         |forest, root| {
-            vec![l2::Instruction::Arithmetic {
-                dst: translate_node(forest, root),
-                aop: l2::ArithmeticOp::SubAssign,
-                src: translate_node(forest, forest.child(root, 0)),
-            }]
+            let dst = translate_node(forest, root);
+            vec![
+                l2::Instruction::Arithmetic {
+                    dst,
+                    aop: l2::ArithmeticOp::MulAssign,
+                    src: l2::Value::Number(-1),
+                },
+                l2::Instruction::Arithmetic {
+                    dst,
+                    aop: l2::ArithmeticOp::AddAssign,
+                    src: translate_node(forest, forest.child(root, 0)),
+                },
+            ]
         },
     );
 
@@ -483,18 +510,6 @@ pub fn isel_tiles() -> Vec<Tile> {
         },
     );
 
-    let shl_right = Tile::new(
-        pat!(Shl(pat!(any), pat!(exact)) -> exact),
-        1,
-        |forest, root| {
-            vec![l2::Instruction::Shift {
-                dst: translate_node(forest, root),
-                sop: l2::ShiftOp::ShlAssign,
-                src: translate_node(forest, forest.child(root, 0)),
-            }]
-        },
-    );
-
     let shr_left = Tile::new(
         pat!(Shr(pat!(exact), pat!(any)) -> exact),
         1,
@@ -503,18 +518,6 @@ pub fn isel_tiles() -> Vec<Tile> {
                 dst: translate_node(forest, root),
                 sop: l2::ShiftOp::ShrAssign,
                 src: translate_node(forest, forest.child(root, 1)),
-            }]
-        },
-    );
-
-    let shr_right = Tile::new(
-        pat!(Shr(pat!(any), pat!(exact)) -> exact),
-        1,
-        |forest, root| {
-            vec![l2::Instruction::Shift {
-                dst: translate_node(forest, root),
-                sop: l2::ShiftOp::ShrAssign,
-                src: translate_node(forest, forest.child(root, 0)),
             }]
         },
     );
@@ -547,9 +550,7 @@ pub fn isel_tiles() -> Vec<Tile> {
         bit_and_left,
         bit_and_right,
         shl_left,
-        shl_right,
         shr_left,
-        shr_right,
     ]
 }
 

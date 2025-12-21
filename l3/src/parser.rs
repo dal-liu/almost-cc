@@ -291,6 +291,8 @@ fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
 
 fn program<'src>() -> impl Parser<'src, &'src str, Program, MyExtra<'src>> {
     function()
+        .padded_by(comment().repeated())
+        .padded()
         .repeated()
         .at_least(1)
         .collect::<Vec<Function>>()
