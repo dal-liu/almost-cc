@@ -103,6 +103,10 @@ impl SelectionForest {
         self.node(id).children[idx]
     }
 
+    pub fn result(&self, id: NodeId) -> Option<&Value> {
+        self.node(id).result.as_ref()
+    }
+
     fn new(func: &Function, ctx: &Context) -> Self {
         use Instruction::*;
 
