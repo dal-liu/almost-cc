@@ -6,15 +6,8 @@ use utils::{DisplayResolved, Interner};
 use crate::analysis::{DefUseChain, LivenessResult};
 use crate::isel::contexts::Context;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct NodeId(pub usize);
-
 #[derive(Debug)]
-pub enum NodeKind {
-    Number,
-    Label,
-    Function,
-    Variable,
+pub enum OpKind {
     Assign,
     Add,
     Sub,
@@ -35,6 +28,40 @@ pub enum NodeKind {
     BranchCond,
 }
 
+impl fmt::Display for OpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use OpKind::*;
+        let op = match self {
+            Assign => "<-",
+            Add => "+",
+            Sub => "-",
+            Mul => "*",
+            BitAnd => "&",
+            Shl => "<<",
+            Shr => ">>",
+            Lt => "<",
+            Le => "<=",
+            Eq => "=",
+            Ge => ">=",
+            Gt => ">",
+            Load => "load",
+            Store => "store",
+            Return | ReturnValue => "ret",
+            Branch | BranchCond => "br",
+        };
+        write!(f, "{}", op)
+    }
+}
+
+#[derive(Debug)]
+pub enum NodeKind {
+    Op(OpKind),
+    Value,
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct NodeId(pub usize);
+
 #[derive(Debug)]
 pub struct SFNode {
     pub kind: NodeKind,
@@ -43,47 +70,14 @@ pub struct SFNode {
     pub children: Vec<NodeId>,
 }
 
-impl SFNode {
-    pub fn is_op(&self) -> bool {
-        !matches!(
-            &self.kind,
-            NodeKind::Number | NodeKind::Label | NodeKind::Function | NodeKind::Variable
-        )
-    }
-}
-
 impl DisplayResolved for SFNode {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
-        use NodeKind::*;
-
-        let op = match &self.kind {
-            Number | Label | Function | Variable => None,
-            Assign => Some("<-"),
-            Add => Some("+"),
-            Sub => Some("-"),
-            Mul => Some("*"),
-            BitAnd => Some("&"),
-            Shl => Some("<<"),
-            Shr => Some(">>"),
-            Lt => Some("<"),
-            Le => Some("<="),
-            Eq => Some("="),
-            Ge => Some(">="),
-            Gt => Some(">"),
-            Load => Some("load"),
-            Store => Some("store"),
-            Return | ReturnValue => Some("ret"),
-            Branch | BranchCond => Some("br"),
-        };
-
         if let Some(res) = &self.result {
             write!(f, "{}", res.resolved(interner))?;
         }
-
-        if let Some(op) = op {
+        if let NodeKind::Op(op) = &self.kind {
             write!(f, " {}", op)?;
         }
-
         Ok(())
     }
 }
@@ -107,6 +101,10 @@ impl SelectionForest {
         self.node(id).result.as_ref()
     }
 
+    pub fn kind(&self, id: NodeId) -> &NodeKind {
+        &self.node(id).kind
+    }
+
     fn new(func: &Function, ctx: &Context) -> Self {
         use Instruction::*;
 
@@ -118,42 +116,42 @@ impl SelectionForest {
         for &id in &ctx.inst_ids {
             match &func.basic_blocks[ctx.block_id.0].instructions[id] {
                 Assign { dst, src } => {
-                    forest.alloc_tree(NodeKind::Assign, [src], Some(Value::Variable(*dst)))
+                    forest.alloc_tree(OpKind::Assign, [src], Some(Value::Variable(*dst)))
                 }
                 Binary { dst, lhs, op, rhs } => {
                     let op = match op {
-                        BinaryOp::Add => NodeKind::Add,
-                        BinaryOp::Sub => NodeKind::Sub,
-                        BinaryOp::Mul => NodeKind::Mul,
-                        BinaryOp::BitAnd => NodeKind::BitAnd,
-                        BinaryOp::Shl => NodeKind::Shl,
-                        BinaryOp::Shr => NodeKind::Shr,
+                        BinaryOp::Add => OpKind::Add,
+                        BinaryOp::Sub => OpKind::Sub,
+                        BinaryOp::Mul => OpKind::Mul,
+                        BinaryOp::BitAnd => OpKind::BitAnd,
+                        BinaryOp::Shl => OpKind::Shl,
+                        BinaryOp::Shr => OpKind::Shr,
                     };
                     forest.alloc_tree(op, [lhs, rhs], Some(Value::Variable(*dst)))
                 }
                 Compare { dst, lhs, cmp, rhs } => {
                     let cmp = match cmp {
-                        CompareOp::Lt => NodeKind::Lt,
-                        CompareOp::Le => NodeKind::Le,
-                        CompareOp::Eq => NodeKind::Eq,
-                        CompareOp::Ge => NodeKind::Ge,
-                        CompareOp::Gt => NodeKind::Gt,
+                        CompareOp::Lt => OpKind::Lt,
+                        CompareOp::Le => OpKind::Le,
+                        CompareOp::Eq => OpKind::Eq,
+                        CompareOp::Ge => OpKind::Ge,
+                        CompareOp::Gt => OpKind::Gt,
                     };
                     forest.alloc_tree(cmp, [lhs, rhs], Some(Value::Variable(*dst)))
                 }
                 Load { dst, src } => forest.alloc_tree(
-                    NodeKind::Load,
+                    OpKind::Load,
                     [&Value::Variable(*src)],
                     Some(Value::Variable(*dst)),
                 ),
                 Store { dst, src } => {
-                    forest.alloc_tree(NodeKind::Store, [&Value::Variable(*dst), src], None)
+                    forest.alloc_tree(OpKind::Store, [&Value::Variable(*dst), src], None)
                 }
-                Return => forest.alloc_tree(NodeKind::Return, [], None),
-                ReturnValue(val) => forest.alloc_tree(NodeKind::ReturnValue, [val], None),
-                Branch(label) => forest.alloc_tree(NodeKind::Branch, [&Value::Label(*label)], None),
+                Return => forest.alloc_tree(OpKind::Return, [], None),
+                ReturnValue(val) => forest.alloc_tree(OpKind::ReturnValue, [val], None),
+                Branch(label) => forest.alloc_tree(OpKind::Branch, [&Value::Label(*label)], None),
                 BranchCond { cond, label } => {
-                    forest.alloc_tree(NodeKind::BranchCond, [cond, &Value::Label(*label)], None)
+                    forest.alloc_tree(OpKind::BranchCond, [cond, &Value::Label(*label)], None)
                 }
                 Label(_) | Call { .. } | CallResult { .. } => {
                     unreachable!("illegal context instruction")
@@ -166,7 +164,7 @@ impl SelectionForest {
 
     fn alloc_tree<'a>(
         &mut self,
-        kind: NodeKind,
+        kind: OpKind,
         children: impl IntoIterator<Item = &'a Value>,
         result: Option<Value>,
     ) {
@@ -174,14 +172,8 @@ impl SelectionForest {
             .into_iter()
             .copied()
             .map(|val| {
-                let kind = match val {
-                    Value::Number(_) => NodeKind::Number,
-                    Value::Label(_) => NodeKind::Label,
-                    Value::Function(_) => NodeKind::Function,
-                    Value::Variable(_) => NodeKind::Variable,
-                };
                 self.alloc(SFNode {
-                    kind,
+                    kind: NodeKind::Value,
                     result: Some(val),
                     parent: None,
                     children: Vec::new(),
@@ -190,7 +182,7 @@ impl SelectionForest {
             .collect();
 
         let root = self.alloc(SFNode {
-            kind,
+            kind: NodeKind::Op(kind),
             result,
             parent: None,
             children: children.clone(),

@@ -8,7 +8,7 @@ use utils::{DisplayResolved, Interner};
 
 use crate::analysis::{DefUseChain, compute_liveness, compute_reaching_def};
 use crate::isel::contexts::create_contexts;
-use crate::isel::forest::{NodeId, SelectionForest, generate_forest};
+use crate::isel::forest::{NodeId, NodeKind, SelectionForest, generate_forest};
 use crate::isel::tiling::{Cover, cover_forest, isel_tiles};
 use crate::translation::{translate_symbol_id, translate_value};
 
@@ -106,7 +106,7 @@ impl CodeGenerator {
             let node = forest.node(id);
 
             for &child in &node.children {
-                if node.is_op() {
+                if matches!(&node.kind, NodeKind::Op(_)) {
                     dfs(forest, child, stream, cover, interner)?;
                 }
             }

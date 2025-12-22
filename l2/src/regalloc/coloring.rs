@@ -152,7 +152,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
     fn mk_worklist(&mut self) {
         let num_nodes = self.interference.interner.len();
         for node in (0..num_nodes).filter(|n| !self.precolored.contains(n)) {
-            if self.interference.degree(node) >= Register::num_gp_registers() {
+            if self.interference.degree(node) >= Register::NUM_GP_REGISTERS {
                 self.spill_worklist.set(node);
             } else if self.is_move_related(node) {
                 self.freeze_worklist.set(node);
@@ -271,7 +271,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
     }
 
     fn decrement_degree(&mut self, node: ValueId) {
-        if self.interference.degree(node) == Register::num_gp_registers() {
+        if self.interference.degree(node) == Register::NUM_GP_REGISTERS {
             let nodes: Vec<ValueId> = iter::once(node)
                 .chain(&self.interference.graph[node])
                 .collect();
@@ -336,7 +336,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
     fn add_worklist(&mut self, node: ValueId) {
         if !self.precolored.contains(&node)
             && !self.is_move_related(node)
-            && self.interference.degree(node) < Register::num_gp_registers()
+            && self.interference.degree(node) < Register::NUM_GP_REGISTERS
         {
             self.freeze_worklist.reset(node);
             self.simplify_worklist.set(node);
@@ -345,7 +345,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
 
     fn can_coalesce_george(&self, u: ValueId, v: ValueId) -> bool {
         self.adjacent(v).iter().all(|&n| {
-            self.interference.degree(n) < Register::num_gp_registers()
+            self.interference.degree(n) < Register::NUM_GP_REGISTERS
                 || self.precolored.contains(&n)
                 || self.interference.has_edge(u, n)
         })
@@ -358,11 +358,11 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
 
         let mut k = 0;
         for node in &nodes {
-            if self.interference.degree(node) >= Register::num_gp_registers() {
+            if self.interference.degree(node) >= Register::NUM_GP_REGISTERS {
                 k += 1;
             }
         }
-        return k < Register::num_gp_registers();
+        return k < Register::NUM_GP_REGISTERS;
     }
 
     fn get_alias(&self, node: ValueId) -> ValueId {
@@ -391,8 +391,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
             self.decrement_degree(neighbor);
         }
 
-        if self.interference.degree(u) >= Register::num_gp_registers()
-            && self.freeze_worklist.test(u)
+        if self.interference.degree(u) >= Register::NUM_GP_REGISTERS && self.freeze_worklist.test(u)
         {
             self.freeze_worklist.reset(u);
             self.spill_worklist.set(u);
@@ -427,7 +426,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
             };
 
             if self.node_moves(v).is_empty()
-                && self.interference.degree(v) < Register::num_gp_registers()
+                && self.interference.degree(v) < Register::NUM_GP_REGISTERS
             {
                 self.freeze_worklist.reset(v);
                 self.simplify_worklist.set(v);

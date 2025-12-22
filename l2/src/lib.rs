@@ -45,12 +45,10 @@ impl Register {
         Register::R15,
     ];
 
+    pub const NUM_GP_REGISTERS: usize = 15;
+
     pub fn gp_registers() -> Vec<Register> {
         [Self::CALLER_SAVED, Self::CALLEE_SAVED].concat()
-    }
-
-    pub fn num_gp_registers() -> usize {
-        Self::CALLER_SAVED.len() + Self::CALLEE_SAVED.len()
     }
 }
 

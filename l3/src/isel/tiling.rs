@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use l2;
 use l3::*;
 
-use crate::isel::forest::{NodeId, NodeKind, SFNode, SelectionForest};
+use crate::isel::forest::{NodeId, NodeKind, OpKind, SFNode, SelectionForest};
 use crate::translation::{translate_symbol_id, translate_value};
 
 macro_rules! pat {
@@ -31,54 +31,49 @@ macro_rules! pat {
     (number: $num:literal) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, _| {
-                matches!(&node.kind, NodeKind::Number)
-                    && matches!(&node.result, Some(Value::Number(num)) if *num == $num)
-            }
+            matches: |node, _| matches!(&node.result, Some(Value::Number(num)) if *num == $num),
         }
     };
 
     (multiple: $mul:literal) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, _| {
-                matches!(&node.kind, NodeKind::Number)
-                    && matches!(&node.result, Some(Value::Number(num)) if *num % $mul == 0)
-            }
+            matches: |node, _| matches!(&node.result, Some(Value::Number(num)) if *num % $mul == 0),
         }
     };
 
-    (power: 2) => {
+    (power) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, _| {
-                matches!(&node.kind, NodeKind::Number)
-                    && matches!(&node.result, Some(Value::Number(num)) if *num > 0 && *num & (num - 1) == 0)
-            }
+            matches: |node, _| matches!(&node.result, Some(Value::Number(num)) if *num > 0 && *num & (num - 1) == 0),
         }
     };
 
     (scale) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, _| {
-                matches!(&node.kind, NodeKind::Number)
-                    && matches!(&node.result, Some(Value::Number(num)) if matches!(*num, 1 | 2 | 4 | 8))
-            }
+            matches: |node, _| matches!(&node.result, Some(Value::Number(num)) if matches!(*num, 1 | 2 | 4 | 8)),
+        }
+    };
+
+    (variable) => {
+        Pattern {
+            children: Vec::new(),
+            matches: |node, _| matches!(&node.result, Some(Value::Variable(_)))
         }
     };
 
     ($kind:ident) => {
         Pattern {
             children: Vec::new(),
-            matches: |node, _| matches!(&node.kind, NodeKind::$kind),
+            matches: |node, _| matches!(&node.kind, NodeKind::Op(OpKind::$kind)),
         }
     };
 
     ($kind:ident($($child:expr),*)) => {
         Pattern {
             children: vec![$($child),*],
-            matches: |node, _| matches!(&node.kind, NodeKind::$kind),
+            matches: |node, _| matches!(&node.kind, NodeKind::Op(OpKind::$kind)),
         }
     };
 }
@@ -126,7 +121,7 @@ impl Tile {
             }
 
             if pat.children.is_empty() {
-                if node.is_op() && node.result.is_some() {
+                if matches!(&node.kind, NodeKind::Op(_)) && node.result.is_some() {
                     uncovered.push(id);
                 }
                 return true;
@@ -164,7 +159,7 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
             .node(id)
             .children
             .iter()
-            .filter(|&&child| forest.node(child).is_op())
+            .filter(|&&child| matches!(forest.kind(child), NodeKind::Op(_)))
         {
             dfs(forest, child, tiles, dp)
         }
@@ -363,7 +358,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR1 <- load VAR2
-    let load = Tile::new(pat!(Load(pat!(any))), 1, |forest, root| {
+    let load = Tile::new(pat!(Load(pat!(variable))), 1, |forest, root| {
         vec![l2::Instruction::Load {
             dst: translate_node(forest, root),
             src: translate_node(forest, forest.child(root, 0)),
@@ -372,7 +367,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // store VAR <- VAL
-    let store = Tile::new(pat!(Store(pat!(any), pat!(any))), 1, |forest, root| {
+    let store = Tile::new(pat!(Store(pat!(variable), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Store {
             dst: translate_node(forest, forest.child(root, 0)),
             offset: 0,
@@ -418,7 +413,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 + MUL 8
     // VAR3 <- load VAR1
     let load_add_offset_left = Tile::new(
-        pat!(Load(pat!(Add(pat!(any), pat!(multiple: 8))))),
+        pat!(Load(pat!(Add(pat!(variable), pat!(multiple: 8))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -436,7 +431,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- MUL 8 + VAR2
     // VAR3 <- load VAR1
     let load_add_offset_right = Tile::new(
-        pat!(Load(pat!(Add(pat!(multiple: 8), pat!(any))))),
+        pat!(Load(pat!(Add(pat!(multiple: 8), pat!(variable))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 0))
@@ -454,7 +449,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 - MUL 8
     // VAR3 <- load VAR1
     let load_sub_offset = Tile::new(
-        pat!(Load(pat!(Sub(pat!(any), pat!(multiple: 8))))),
+        pat!(Load(pat!(Sub(pat!(variable), pat!(multiple: 8))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -465,6 +460,63 @@ pub fn isel_tiles() -> Vec<Tile> {
                 dst: translate_node(forest, root),
                 src: translate_node(forest, forest.child(forest.child(root, 0), 0)),
                 offset: -(*num),
+            }]
+        },
+    );
+
+    // VAR1 <- VAR2 + MUL 8
+    // store VAR1 <- VAL
+    let store_add_offset_left = Tile::new(
+        pat!(Store(
+            pat!(Add(pat!(variable), pat!(multiple: 8))),
+            pat!(any)
+        )),
+        1,
+        |forest, root| {
+            let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
+            else {
+                unreachable!("store add offset left tile should have multiple of 8")
+            };
+            vec![l2::Instruction::Store {
+                dst: translate_node(forest, forest.child(forest.child(root, 0), 0)),
+                offset: *num,
+                src: translate_node(forest, forest.child(root, 1)),
+            }]
+        },
+    );
+
+    // VAR1 <- MUL 8 + VAR2
+    // store VAR1 <- VAL
+    let store_add_offset_right = Tile::new(
+        pat!(Store(pat!(Add(pat!(multiple: 8), pat!(any))), pat!(any))),
+        1,
+        |forest, root| {
+            let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 0))
+            else {
+                unreachable!("store add offset right tile should have multiple of 8")
+            };
+            vec![l2::Instruction::Store {
+                dst: translate_node(forest, forest.child(forest.child(root, 0), 1)),
+                offset: *num,
+                src: translate_node(forest, forest.child(root, 1)),
+            }]
+        },
+    );
+
+    // VAR1 <- VAR2 - MUL 8
+    // store VAR1 <- VAL
+    let store_sub_offset = Tile::new(
+        pat!(Store(pat!(Sub(pat!(any), pat!(multiple: 8))), pat!(any))),
+        1,
+        |forest, root| {
+            let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
+            else {
+                unreachable!("store sub offset left tile should have multiple of 8")
+            };
+            vec![l2::Instruction::Store {
+                dst: translate_node(forest, forest.child(forest.child(root, 0), 0)),
+                offset: -(*num),
+                src: translate_node(forest, forest.child(root, 1)),
             }]
         },
     );
@@ -568,7 +620,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL * POW 2
-    let assign_shl_mul_left = Tile::new(pat!(Mul(pat!(any), pat!(power: 2))), 2, |forest, root| {
+    let assign_mul_power_left = Tile::new(pat!(Mul(pat!(any), pat!(power))), 2, |forest, root| {
         let Some(Value::Number(num)) = forest.result(forest.child(root, 1)) else {
             unreachable!("assign shl mul left tile should have a power of 2")
         };
@@ -587,27 +639,26 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- POW 2 * VAL
-    let assign_shl_mul_right =
-        Tile::new(pat!(Mul(pat!(power: 2), pat!(any))), 2, |forest, root| {
-            let Some(Value::Number(num)) = forest.result(forest.child(root, 0)) else {
-                unreachable!("assign shl mul right tile should have a power of 2")
-            };
-            let dst = translate_node(forest, root);
-            vec![
-                l2::Instruction::Assign {
-                    dst,
-                    src: translate_node(forest, forest.child(root, 1)),
-                },
-                l2::Instruction::Shift {
-                    dst,
-                    sop: l2::ShiftOp::ShlAssign,
-                    src: l2::Value::Number(num.trailing_zeros().into()),
-                },
-            ]
-        });
+    let assign_mul_power_right = Tile::new(pat!(Mul(pat!(power), pat!(any))), 2, |forest, root| {
+        let Some(Value::Number(num)) = forest.result(forest.child(root, 0)) else {
+            unreachable!("assign shl mul right tile should have a power of 2")
+        };
+        let dst = translate_node(forest, root);
+        vec![
+            l2::Instruction::Assign {
+                dst,
+                src: translate_node(forest, forest.child(root, 1)),
+            },
+            l2::Instruction::Shift {
+                dst,
+                sop: l2::ShiftOp::ShlAssign,
+                src: l2::Value::Number(num.trailing_zeros().into()),
+            },
+        ]
+    });
 
     // VAR <- VAR * POW 2
-    let shl_mul_left = Tile::new(pat!(Mul(pat!(exact), pat!(power: 2))), 1, |forest, root| {
+    let mul_power_left = Tile::new(pat!(Mul(pat!(exact), pat!(power))), 1, |forest, root| {
         let Some(Value::Number(num)) = forest.result(forest.child(root, 1)) else {
             unreachable!("shl mul left tile should have a power of 2")
         };
@@ -619,7 +670,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- POW 2 * VAR
-    let shl_mul_right = Tile::new(pat!(Mul(pat!(power: 2), pat!(exact))), 1, |forest, root| {
+    let mul_power_right = Tile::new(pat!(Mul(pat!(power), pat!(exact))), 1, |forest, root| {
         let Some(Value::Number(num)) = forest.result(forest.child(root, 0)) else {
             unreachable!("shl mul right tile should have a power of 2")
         };
@@ -752,7 +803,7 @@ pub fn isel_tiles() -> Vec<Tile> {
         vec![
             l2::Instruction::Assign {
                 dst,
-                src: translate_node(forest, forest.child(root, 1)),
+                src: translate_node(forest, forest.child(root, 0)),
             },
             l2::Instruction::Decrement(dst),
         ]
@@ -799,7 +850,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 * NUM 1 | 2 | 4 | 8
     // VAR4 <- VAL3 + VAR1
     let lea_left_left = Tile::new(
-        pat!(Add(pat!(Variable), pat!(Mul(pat!(Variable), pat!(scale))))),
+        pat!(Add(pat!(variable), pat!(Mul(pat!(variable), pat!(scale))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 1), 1))
@@ -820,7 +871,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- NUM 1 | 2 | 4 | 8 * VAR2
     // VAR4 <- VAR3 + VAR1
     let lea_left_right = Tile::new(
-        pat!(Add(pat!(Variable), pat!(Mul(pat!(scale), pat!(Variable))))),
+        pat!(Add(pat!(variable), pat!(Mul(pat!(scale), pat!(variable))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 1), 0))
@@ -831,7 +882,7 @@ pub fn isel_tiles() -> Vec<Tile> {
                 vec![l2::Instruction::LEA {
                     dst: translate_node(forest, root),
                     src: translate_node(forest, forest.child(root, 0)),
-                    offset: translate_node(forest, forest.child(forest.child(root, 1), 0)),
+                    offset: translate_node(forest, forest.child(forest.child(root, 1), 1)),
                     scale: *num as u8,
                 }]
             }
@@ -841,7 +892,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 * NUM 1 | 2 | 4 | 8
     // VAR4 <- VAR1 + VAR3
     let lea_right_left = Tile::new(
-        pat!(Add(pat!(Mul(pat!(Variable), pat!(scale))), pat!(Variable))),
+        pat!(Add(pat!(Mul(pat!(variable), pat!(scale))), pat!(variable))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -862,7 +913,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- NUM 1 | 2 | 4 | 8 * VAR2
     // VAR4 <- VAR1 + VAR3
     let lea_right_right = Tile::new(
-        pat!(Add(pat!(Mul(pat!(scale), pat!(Variable))), pat!(Variable))),
+        pat!(Add(pat!(Mul(pat!(scale), pat!(variable))), pat!(variable))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 0))
@@ -880,12 +931,11 @@ pub fn isel_tiles() -> Vec<Tile> {
         },
     );
 
-    // TODO: store offset, arith mem
     vec![
-        assign_shl_mul_left,
-        assign_shl_mul_right,
-        shl_mul_left,
-        shl_mul_right,
+        assign_mul_power_left,
+        assign_mul_power_right,
+        mul_power_left,
+        mul_power_right,
         assign_increment_left,
         assign_increment_right,
         assign_decrement,
@@ -914,6 +964,9 @@ pub fn isel_tiles() -> Vec<Tile> {
         load_add_offset_left,
         load_add_offset_right,
         load_sub_offset,
+        store_add_offset_left,
+        store_add_offset_right,
+        store_sub_offset,
         add_left,
         add_right,
         sub_left,
@@ -939,6 +992,6 @@ pub fn isel_tiles() -> Vec<Tile> {
 fn translate_node(forest: &SelectionForest, id: NodeId) -> l2::Value {
     match forest.result(id) {
         Some(val) => translate_value(val),
-        None => unreachable!("nodes should have values"),
+        None => unreachable!("translatable nodes should have values"),
     }
 }
