@@ -28,21 +28,21 @@ macro_rules! pat {
         }
     };
 
-    (number: $num:literal) => {
+    (num: $num:literal) => {
         Pattern {
             children: Vec::new(),
             matches: |node, _| matches!(&node.result, Some(Value::Number(num)) if *num == $num),
         }
     };
 
-    (multiple: $mul:literal) => {
+    (mul: $mul:literal) => {
         Pattern {
             children: Vec::new(),
             matches: |node, _| matches!(&node.result, Some(Value::Number(num)) if *num % $mul == 0),
         }
     };
 
-    (power) => {
+    (pow) => {
         Pattern {
             children: Vec::new(),
             matches: |node, _| matches!(&node.result, Some(Value::Number(num)) if *num > 0 && *num & (num - 1) == 0),
@@ -56,7 +56,7 @@ macro_rules! pat {
         }
     };
 
-    (variable) => {
+    (var) => {
         Pattern {
             children: Vec::new(),
             matches: |node, _| matches!(&node.result, Some(Value::Variable(_)))
@@ -212,7 +212,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL1 + VAL2
-    let assign_add = Tile::new(pat!(Add(pat!(any), pat!(not))), 2, |forest, root| {
+    let add_any = Tile::new(pat!(Add(pat!(any), pat!(not))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Assign {
@@ -228,7 +228,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR + VAL
-    let add_left = Tile::new(pat!(Add(pat!(exact), pat!(any))), 1, |forest, root| {
+    let add_exact_left = Tile::new(pat!(Add(pat!(exact), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Arithmetic {
             dst: translate_node(forest, root),
             aop: l2::ArithmeticOp::AddAssign,
@@ -237,7 +237,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL + VAR
-    let add_right = Tile::new(pat!(Add(pat!(any), pat!(exact))), 1, |forest, root| {
+    let add_exact_right = Tile::new(pat!(Add(pat!(any), pat!(exact))), 1, |forest, root| {
         vec![l2::Instruction::Arithmetic {
             dst: translate_node(forest, root),
             aop: l2::ArithmeticOp::AddAssign,
@@ -246,7 +246,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL - NOT VAR
-    let assign_sub = Tile::new(pat!(Sub(pat!(any), pat!(not))), 2, |forest, root| {
+    let sub_any = Tile::new(pat!(Sub(pat!(any), pat!(not))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Assign {
@@ -262,7 +262,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR - VAL
-    let sub_left = Tile::new(pat!(Sub(pat!(exact), pat!(any))), 1, |forest, root| {
+    let sub_exact_left = Tile::new(pat!(Sub(pat!(exact), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Arithmetic {
             dst: translate_node(forest, root),
             aop: l2::ArithmeticOp::SubAssign,
@@ -271,7 +271,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL - VAR
-    let sub_right = Tile::new(pat!(Sub(pat!(any), pat!(exact))), 2, |forest, root| {
+    let sub_exact_right = Tile::new(pat!(Sub(pat!(any), pat!(exact))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Arithmetic {
@@ -288,7 +288,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL1 * VAL2
-    let assign_mul = Tile::new(pat!(Mul(pat!(any), pat!(not))), 2, |forest, root| {
+    let mul_any = Tile::new(pat!(Mul(pat!(any), pat!(not))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Assign {
@@ -304,7 +304,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR * VAL
-    let mul_left = Tile::new(pat!(Mul(pat!(exact), pat!(any))), 1, |forest, root| {
+    let mul_exact_left = Tile::new(pat!(Mul(pat!(exact), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Arithmetic {
             dst: translate_node(forest, root),
             aop: l2::ArithmeticOp::MulAssign,
@@ -313,7 +313,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL * VAR
-    let mul_right = Tile::new(pat!(Mul(pat!(any), pat!(exact))), 1, |forest, root| {
+    let mul_exact_right = Tile::new(pat!(Mul(pat!(any), pat!(exact))), 1, |forest, root| {
         vec![l2::Instruction::Arithmetic {
             dst: translate_node(forest, root),
             aop: l2::ArithmeticOp::MulAssign,
@@ -322,7 +322,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL1 & VAL2
-    let assign_bit_and = Tile::new(pat!(BitAnd(pat!(any), pat!(not))), 2, |forest, root| {
+    let bit_and_any = Tile::new(pat!(BitAnd(pat!(any), pat!(not))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Assign {
@@ -338,7 +338,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR & VAL
-    let bit_and_left = Tile::new(pat!(BitAnd(pat!(exact), pat!(any))), 1, |forest, root| {
+    let bit_and_exact_left = Tile::new(pat!(BitAnd(pat!(exact), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Arithmetic {
             dst: translate_node(forest, root),
             aop: l2::ArithmeticOp::BitAndAssign,
@@ -347,7 +347,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL & VAR
-    let bit_and_right = Tile::new(pat!(BitAnd(pat!(any), pat!(exact))), 1, |forest, root| {
+    let bit_and_exact_right = Tile::new(pat!(BitAnd(pat!(any), pat!(exact))), 1, |forest, root| {
         vec![l2::Instruction::Arithmetic {
             dst: translate_node(forest, root),
             aop: l2::ArithmeticOp::BitAndAssign,
@@ -356,7 +356,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL1 << VAL2
-    let assign_shl = Tile::new(pat!(Shl(pat!(any), pat!(not))), 2, |forest, root| {
+    let shl_any = Tile::new(pat!(Shl(pat!(any), pat!(not))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Assign {
@@ -372,7 +372,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR << VAL
-    let shl_left = Tile::new(pat!(Shl(pat!(exact), pat!(any))), 1, |forest, root| {
+    let shl_exact_left = Tile::new(pat!(Shl(pat!(exact), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Shift {
             dst: translate_node(forest, root),
             sop: l2::ShiftOp::ShlAssign,
@@ -381,7 +381,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAL1 >> VAL2
-    let assign_shr = Tile::new(pat!(Shr(pat!(any), pat!(not))), 2, |forest, root| {
+    let shr_any = Tile::new(pat!(Shr(pat!(any), pat!(not))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Assign {
@@ -397,7 +397,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR >> VAL
-    let shr_left = Tile::new(pat!(Shr(pat!(exact), pat!(any))), 1, |forest, root| {
+    let shr_exact_left = Tile::new(pat!(Shr(pat!(exact), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Shift {
             dst: translate_node(forest, root),
             sop: l2::ShiftOp::ShrAssign,
@@ -456,7 +456,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR1 <- load VAR2
-    let load = Tile::new(pat!(Load(pat!(variable))), 1, |forest, root| {
+    let load = Tile::new(pat!(Load(pat!(var))), 1, |forest, root| {
         vec![l2::Instruction::Load {
             dst: translate_node(forest, root),
             src: translate_node(forest, forest.child(root, 0)),
@@ -465,7 +465,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // store VAR <- VAL
-    let store = Tile::new(pat!(Store(pat!(variable), pat!(any))), 1, |forest, root| {
+    let store = Tile::new(pat!(Store(pat!(var), pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Store {
             dst: translate_node(forest, forest.child(root, 0)),
             offset: 0,
@@ -511,7 +511,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 + MUL 8
     // VAR3 <- load VAR1
     let load_add_offset_left = Tile::new(
-        pat!(Load(pat!(Add(pat!(variable), pat!(multiple: 8))))),
+        pat!(Load(pat!(Add(pat!(var), pat!(mul: 8))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -529,7 +529,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- MUL 8 + VAR2
     // VAR3 <- load VAR1
     let load_add_offset_right = Tile::new(
-        pat!(Load(pat!(Add(pat!(multiple: 8), pat!(variable))))),
+        pat!(Load(pat!(Add(pat!(mul: 8), pat!(var))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 0))
@@ -547,7 +547,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 - MUL 8
     // VAR3 <- load VAR1
     let load_sub_offset = Tile::new(
-        pat!(Load(pat!(Sub(pat!(variable), pat!(multiple: 8))))),
+        pat!(Load(pat!(Sub(pat!(var), pat!(mul: 8))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -565,10 +565,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 + MUL 8
     // store VAR1 <- VAL
     let store_add_offset_left = Tile::new(
-        pat!(Store(
-            pat!(Add(pat!(variable), pat!(multiple: 8))),
-            pat!(any)
-        )),
+        pat!(Store(pat!(Add(pat!(var), pat!(mul: 8))), pat!(any))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -586,7 +583,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- MUL 8 + VAR2
     // store VAR1 <- VAL
     let store_add_offset_right = Tile::new(
-        pat!(Store(pat!(Add(pat!(multiple: 8), pat!(any))), pat!(any))),
+        pat!(Store(pat!(Add(pat!(mul: 8), pat!(any))), pat!(any))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 0))
@@ -604,7 +601,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     // VAR1 <- VAR2 - MUL 8
     // store VAR1 <- VAL
     let store_sub_offset = Tile::new(
-        pat!(Store(pat!(Sub(pat!(any), pat!(multiple: 8))), pat!(any))),
+        pat!(Store(pat!(Sub(pat!(any), pat!(mul: 8))), pat!(any))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -620,7 +617,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     );
 
     // VAR <- VAL * POW 2
-    let assign_mul_power_left = Tile::new(pat!(Mul(pat!(any), pat!(power))), 2, |forest, root| {
+    let mul_by_pow_any_left = Tile::new(pat!(Mul(pat!(any), pat!(pow))), 2, |forest, root| {
         let Some(Value::Number(num)) = forest.result(forest.child(root, 1)) else {
             unreachable!("assign shl mul left tile should have a power of 2")
         };
@@ -639,7 +636,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- POW 2 * VAL
-    let assign_mul_power_right = Tile::new(pat!(Mul(pat!(power), pat!(any))), 2, |forest, root| {
+    let mul_by_pow_any_right = Tile::new(pat!(Mul(pat!(pow), pat!(any))), 2, |forest, root| {
         let Some(Value::Number(num)) = forest.result(forest.child(root, 0)) else {
             unreachable!("assign shl mul right tile should have a power of 2")
         };
@@ -658,7 +655,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR * POW 2
-    let mul_power_left = Tile::new(pat!(Mul(pat!(exact), pat!(power))), 1, |forest, root| {
+    let mul_by_pow_exact_left = Tile::new(pat!(Mul(pat!(exact), pat!(pow))), 1, |forest, root| {
         let Some(Value::Number(num)) = forest.result(forest.child(root, 1)) else {
             unreachable!("shl mul left tile should have a power of 2")
         };
@@ -670,7 +667,7 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- POW 2 * VAR
-    let mul_power_right = Tile::new(pat!(Mul(pat!(power), pat!(exact))), 1, |forest, root| {
+    let mul_by_pow_exact_right = Tile::new(pat!(Mul(pat!(pow), pat!(exact))), 1, |forest, root| {
         let Some(Value::Number(num)) = forest.result(forest.child(root, 0)) else {
             unreachable!("shl mul right tile should have a power of 2")
         };
@@ -772,47 +769,43 @@ pub fn isel_tiles() -> Vec<Tile> {
     );
 
     // VAR <- VAL + 1
-    let assign_increment_left =
-        Tile::new(pat!(Add(pat!(any), pat!(number: 1))), 2, |forest, root| {
-            let dst = translate_node(forest, root);
-            vec![
-                l2::Instruction::Assign {
-                    dst,
-                    src: translate_node(forest, forest.child(root, 0)),
-                },
-                l2::Instruction::Increment(dst),
-            ]
-        });
+    let increment_any_left = Tile::new(pat!(Add(pat!(any), pat!(num: 1))), 2, |forest, root| {
+        let dst = translate_node(forest, root);
+        vec![
+            l2::Instruction::Assign {
+                dst,
+                src: translate_node(forest, forest.child(root, 0)),
+            },
+            l2::Instruction::Increment(dst),
+        ]
+    });
 
     // VAR <- 1 + VAL
-    let assign_increment_right =
-        Tile::new(pat!(Add(pat!(number: 1), pat!(any))), 2, |forest, root| {
-            let dst = translate_node(forest, root);
-            vec![
-                l2::Instruction::Assign {
-                    dst,
-                    src: translate_node(forest, forest.child(root, 1)),
-                },
-                l2::Instruction::Increment(dst),
-            ]
-        });
+    let increment_any_right = Tile::new(pat!(Add(pat!(num: 1), pat!(any))), 2, |forest, root| {
+        let dst = translate_node(forest, root);
+        vec![
+            l2::Instruction::Assign {
+                dst,
+                src: translate_node(forest, forest.child(root, 1)),
+            },
+            l2::Instruction::Increment(dst),
+        ]
+    });
 
     // VAR <- VAR + 1
-    let increment_left = Tile::new(
-        pat!(Add(pat!(exact), pat!(number: 1))),
-        1,
-        |forest, root| vec![l2::Instruction::Increment(translate_node(forest, root))],
-    );
+    let increment_exact_left =
+        Tile::new(pat!(Add(pat!(exact), pat!(num: 1))), 1, |forest, root| {
+            vec![l2::Instruction::Increment(translate_node(forest, root))]
+        });
 
     // VAR <- 1 + VAR
-    let increment_right = Tile::new(
-        pat!(Add(pat!(number: 1), pat!(exact))),
-        1,
-        |forest, root| vec![l2::Instruction::Increment(translate_node(forest, root))],
-    );
+    let increment_exact_right =
+        Tile::new(pat!(Add(pat!(num: 1), pat!(exact))), 1, |forest, root| {
+            vec![l2::Instruction::Increment(translate_node(forest, root))]
+        });
 
     // VAR <- VAL - 1
-    let assign_decrement = Tile::new(pat!(Sub(pat!(any), pat!(number: 1))), 2, |forest, root| {
+    let decrement_any = Tile::new(pat!(Sub(pat!(any), pat!(num: 1))), 2, |forest, root| {
         let dst = translate_node(forest, root);
         vec![
             l2::Instruction::Assign {
@@ -824,17 +817,14 @@ pub fn isel_tiles() -> Vec<Tile> {
     });
 
     // VAR <- VAR - 1
-    let decrement_left = Tile::new(
-        pat!(Sub(pat!(exact), pat!(number: 1))),
-        1,
-        |forest, root| vec![l2::Instruction::Decrement(translate_node(forest, root))],
-    );
+    let decrement_exact_left =
+        Tile::new(pat!(Sub(pat!(exact), pat!(num: 1))), 1, |forest, root| {
+            vec![l2::Instruction::Decrement(translate_node(forest, root))]
+        });
 
     // VAR <- 1 - VAR
-    let decrement_right = Tile::new(
-        pat!(Sub(pat!(number: 1), pat!(exact))),
-        2,
-        |forest, root| {
+    let decrement_exact_right =
+        Tile::new(pat!(Sub(pat!(num: 1), pat!(exact))), 2, |forest, root| {
             let dst = translate_node(forest, root);
             vec![
                 l2::Instruction::Arithmetic {
@@ -844,24 +834,23 @@ pub fn isel_tiles() -> Vec<Tile> {
                 },
                 l2::Instruction::Increment(dst),
             ]
-        },
-    );
+        });
 
-    // VAR1 <- VAR2 * NUM 1 | 2 | 4 | 8
-    // VAR4 <- VAL3 + VAR1
-    let lea_left_left = Tile::new(
-        pat!(Add(pat!(variable), pat!(Mul(pat!(variable), pat!(scale))))),
+    // VAR1 <- NUM 1 | 2 | 4 | 8 * VAR2
+    // VAR4 <- VAR1 + VAR3
+    let lea_scale_left_left = Tile::new(
+        pat!(Add(pat!(Mul(pat!(scale), pat!(var))), pat!(var))),
         1,
         |forest, root| {
-            let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 1), 1))
+            let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 0))
             else {
-                unreachable!("lea left left tile should have 1, 2, 4, or 8")
+                unreachable!("lea right right tile should have 1, 2, 4, or 8")
             };
             {
                 vec![l2::Instruction::LEA {
                     dst: translate_node(forest, root),
-                    src: translate_node(forest, forest.child(root, 0)),
-                    offset: translate_node(forest, forest.child(forest.child(root, 1), 0)),
+                    src: translate_node(forest, forest.child(root, 1)),
+                    offset: translate_node(forest, forest.child(forest.child(root, 0), 1)),
                     scale: *num as u8,
                 }]
             }
@@ -870,8 +859,8 @@ pub fn isel_tiles() -> Vec<Tile> {
 
     // VAR1 <- NUM 1 | 2 | 4 | 8 * VAR2
     // VAR4 <- VAR3 + VAR1
-    let lea_left_right = Tile::new(
-        pat!(Add(pat!(variable), pat!(Mul(pat!(scale), pat!(variable))))),
+    let lea_scale_left_right = Tile::new(
+        pat!(Add(pat!(var), pat!(Mul(pat!(scale), pat!(var))))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 1), 0))
@@ -891,8 +880,8 @@ pub fn isel_tiles() -> Vec<Tile> {
 
     // VAR1 <- VAR2 * NUM 1 | 2 | 4 | 8
     // VAR4 <- VAR1 + VAR3
-    let lea_right_left = Tile::new(
-        pat!(Add(pat!(Mul(pat!(variable), pat!(scale))), pat!(variable))),
+    let lea_scale_right_left = Tile::new(
+        pat!(Add(pat!(Mul(pat!(var), pat!(scale))), pat!(var))),
         1,
         |forest, root| {
             let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 1))
@@ -910,21 +899,21 @@ pub fn isel_tiles() -> Vec<Tile> {
         },
     );
 
-    // VAR1 <- NUM 1 | 2 | 4 | 8 * VAR2
-    // VAR4 <- VAR1 + VAR3
-    let lea_right_right = Tile::new(
-        pat!(Add(pat!(Mul(pat!(scale), pat!(variable))), pat!(variable))),
+    // VAR1 <- VAR2 * NUM 1 | 2 | 4 | 8
+    // VAR4 <- VAL3 + VAR1
+    let lea_scale_right_right = Tile::new(
+        pat!(Add(pat!(var), pat!(Mul(pat!(var), pat!(scale))))),
         1,
         |forest, root| {
-            let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 0), 0))
+            let Some(Value::Number(num)) = forest.result(forest.child(forest.child(root, 1), 1))
             else {
-                unreachable!("lea right right tile should have 1, 2, 4, or 8")
+                unreachable!("lea left left tile should have 1, 2, 4, or 8")
             };
             {
                 vec![l2::Instruction::LEA {
                     dst: translate_node(forest, root),
-                    src: translate_node(forest, forest.child(root, 1)),
-                    offset: translate_node(forest, forest.child(forest.child(root, 0), 1)),
+                    src: translate_node(forest, forest.child(root, 0)),
+                    offset: translate_node(forest, forest.child(forest.child(root, 1), 0)),
                     scale: *num as u8,
                 }]
             }
@@ -932,34 +921,34 @@ pub fn isel_tiles() -> Vec<Tile> {
     );
 
     vec![
-        assign_mul_power_left,
-        assign_mul_power_right,
-        mul_power_left,
-        mul_power_right,
-        assign_increment_left,
-        assign_increment_right,
-        increment_left,
-        increment_right,
-        assign_decrement,
-        decrement_left,
-        decrement_right,
+        mul_by_pow_any_left,
+        mul_by_pow_any_right,
+        mul_by_pow_exact_left,
+        mul_by_pow_exact_right,
+        increment_any_left,
+        increment_any_right,
+        increment_exact_left,
+        increment_exact_right,
+        decrement_any,
+        decrement_exact_left,
+        decrement_exact_right,
         assign,
-        assign_add,
-        add_left,
-        add_right,
-        assign_sub,
-        sub_left,
-        sub_right,
-        assign_mul,
-        mul_left,
-        mul_right,
-        assign_bit_and,
-        bit_and_left,
-        bit_and_right,
-        assign_shl,
-        shl_left,
-        assign_shr,
-        shr_left,
+        add_any,
+        add_exact_left,
+        add_exact_right,
+        sub_any,
+        sub_exact_left,
+        sub_exact_right,
+        mul_any,
+        mul_exact_left,
+        mul_exact_right,
+        bit_and_any,
+        bit_and_exact_left,
+        bit_and_exact_right,
+        shl_any,
+        shl_exact_left,
+        shr_any,
+        shr_exact_left,
         le,
         lt,
         eq,
@@ -982,10 +971,10 @@ pub fn isel_tiles() -> Vec<Tile> {
         branch_cond_eq,
         branch_cond_ge,
         branch_cond_gt,
-        lea_left_left,
-        lea_left_right,
-        lea_right_left,
-        lea_right_right,
+        lea_scale_left_left,
+        lea_scale_left_right,
+        lea_scale_right_left,
+        lea_scale_right_right,
     ]
 }
 
