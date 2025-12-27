@@ -73,10 +73,10 @@ pub struct SFNode {
 impl DisplayResolved for SFNode {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         if let Some(res) = &self.result {
-            write!(f, "{}", res.resolved(interner))?;
+            write!(f, "{} ", res.resolved(interner))?;
         }
         if let NodeKind::Op(op) = &self.kind {
-            write!(f, " {}", op)?;
+            write!(f, "{}", op)?;
         }
         Ok(())
     }
@@ -89,20 +89,24 @@ pub struct SelectionForest {
 }
 
 impl SelectionForest {
-    pub fn node(&self, id: NodeId) -> &SFNode {
-        &self.arena[id.0]
-    }
-
-    pub fn child(&self, id: NodeId, idx: usize) -> NodeId {
-        self.node(id).children[idx]
-    }
-
     pub fn result(&self, id: NodeId) -> Option<&Value> {
-        self.node(id).result.as_ref()
+        self.arena[id.0].result.as_ref()
     }
 
     pub fn kind(&self, id: NodeId) -> &NodeKind {
-        &self.node(id).kind
+        &self.arena[id.0].kind
+    }
+
+    pub fn child(&self, id: NodeId, idx: usize) -> NodeId {
+        self.arena[id.0].children[idx]
+    }
+
+    pub fn children(&self, id: NodeId) -> impl DoubleEndedIterator<Item = NodeId> {
+        self.arena[id.0].children.iter().copied()
+    }
+
+    pub fn num_children(&self, id: NodeId) -> usize {
+        self.arena[id.0].children.len()
     }
 
     fn new(func: &Function, ctx: &Context) -> Self {
@@ -145,7 +149,8 @@ impl SelectionForest {
                     Some(Value::Variable(*dst)),
                 ),
                 Store { dst, src } => {
-                    forest.alloc_tree(OpKind::Store, [&Value::Variable(*dst), src], None)
+                    let dst = Value::Variable(*dst);
+                    forest.alloc_tree(OpKind::Store, [&dst, src], Some(dst))
                 }
                 Return => forest.alloc_tree(OpKind::Return, [], None),
                 ReturnValue(val) => forest.alloc_tree(OpKind::ReturnValue, [val], None),
@@ -189,8 +194,7 @@ impl SelectionForest {
         });
 
         for child in children {
-            let child = &mut self.arena[child.0];
-            child.parent = Some(root);
+            self.arena[child.0].parent = Some(root);
         }
 
         self.roots.push(root);
@@ -233,9 +237,8 @@ impl SelectionForest {
     ) -> bool {
         let u = self.roots[idx1];
         let v = self.roots[idx2];
-        let node1 = &self.node(u);
 
-        let Some(Value::Variable(result)) = &node1.result else {
+        let Some(Value::Variable(result)) = self.result(u) else {
             return false;
         };
 
@@ -272,7 +275,9 @@ impl SelectionForest {
             }
         }
 
-        let parent = self.node(leaf).parent.expect("parent of leaf should exist");
+        let parent = self.arena[leaf.0]
+            .parent
+            .expect("parent of leaf should exist");
 
         if let Some(id) = self.arena[parent.0]
             .children
@@ -296,14 +301,12 @@ impl SelectionForest {
         let mut stack = vec![root];
 
         while let Some(id) = stack.pop() {
-            let node = &self.node(id);
-
-            if !node.children.is_empty() {
-                stack.extend(node.children.iter().rev());
+            if self.num_children(id) > 0 {
+                stack.extend(self.children(id).rev());
                 continue;
             }
 
-            if matches!(&node.result, Some(Value::Variable(var)) if *var == target) {
+            if matches!(self.result(id), Some(Value::Variable(var)) if *var == target) {
                 if leaf.is_some() {
                     return None;
                 }
@@ -321,7 +324,7 @@ impl DisplayResolved for SelectionForest {
             let mut stack = vec![(root, 0)];
 
             while let Some((id, indent)) = stack.pop() {
-                let node = self.node(id);
+                let node = &self.arena[id.0];
 
                 writeln!(f, "{}{}", "  ".repeat(indent), node.resolved(interner))?;
 

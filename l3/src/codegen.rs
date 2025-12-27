@@ -103,10 +103,8 @@ impl CodeGenerator {
             cover: &Cover,
             interner: &Interner<String>,
         ) -> io::Result<()> {
-            let node = forest.node(id);
-
-            for &child in &node.children {
-                if matches!(&node.kind, NodeKind::Op(_)) {
+            for child in forest.children(id) {
+                if matches!(forest.kind(id), NodeKind::Op(_)) {
                     dfs(forest, child, stream, cover, interner)?;
                 }
             }
