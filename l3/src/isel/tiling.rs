@@ -223,9 +223,8 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
     }
 
     forest
-        .roots
-        .iter()
-        .map(|&root| {
+        .roots()
+        .map(|root| {
             let mut dp = HashMap::new();
             dfs(forest, root, tiles, &mut dp);
             dp.remove(&root).unwrap()

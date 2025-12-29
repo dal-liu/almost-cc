@@ -84,8 +84,8 @@ impl DisplayResolved for SFNode {
 
 #[derive(Debug)]
 pub struct SelectionForest {
-    pub arena: Vec<SFNode>,
-    pub roots: Vec<NodeId>,
+    arena: Vec<SFNode>,
+    roots: Vec<NodeId>,
 }
 
 impl SelectionForest {
@@ -107,6 +107,10 @@ impl SelectionForest {
 
     pub fn num_children(&self, id: NodeId) -> usize {
         self.arena[id.0].children.len()
+    }
+
+    pub fn roots(&self) -> impl Iterator<Item = NodeId> {
+        self.roots.iter().copied()
     }
 
     fn new(func: &Function, ctx: &Context) -> Self {
