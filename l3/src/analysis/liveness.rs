@@ -3,7 +3,7 @@ use std::fmt;
 use l3::*;
 use utils::{BitVector, DisplayResolved, Interner};
 
-use crate::analysis::dataflow::{Dataflow, Direction, solve};
+use crate::analysis::dataflow::{Dataflow, Direction};
 
 type InstId = usize;
 
@@ -102,7 +102,7 @@ impl Dataflow for LivenessAnalysis {
 
 pub fn compute_liveness(func: &Function) -> LivenessResult {
     let liveness = LivenessAnalysis::new(func);
-    let (block_out, _) = solve(func, &liveness);
+    let (block_out, _) = liveness.solve(func);
 
     let empty_dataflow_set = || -> Vec<Vec<BitVector>> {
         func.basic_blocks

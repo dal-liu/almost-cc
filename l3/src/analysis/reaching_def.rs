@@ -4,7 +4,7 @@ use std::fmt;
 use l3::*;
 use utils::{BitVector, DisplayResolved, Interner};
 
-use crate::analysis::dataflow::{Dataflow, Direction, solve};
+use crate::analysis::dataflow::{Dataflow, Direction};
 
 type InstId = usize;
 
@@ -131,7 +131,7 @@ pub fn compute_reaching_def(func: &Function) -> ReachingDefResult {
     }
 
     let reaching_def = ReachingDefAnalysis::new(&func_clone);
-    let (block_in, _) = solve(&func_clone, &reaching_def);
+    let (block_in, _) = reaching_def.solve(&func_clone);
 
     let empty_dataflow_set = || -> Vec<Vec<BitVector>> {
         func_clone
