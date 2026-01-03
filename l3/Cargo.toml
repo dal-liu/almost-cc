@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 ariadne = "0.6.0"
-chumsky = "0.11.2"
-clap = { version = "4.5.51", features = ["derive"] }
+chumsky = "0.12.0"
+clap = { version = "4.5.53", features = ["derive"] }
 l2 = { version = "0.1.0", path = "../l2" }
 utils = { version = "0.1.0", path = "../utils" }
 

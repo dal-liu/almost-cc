@@ -50,7 +50,7 @@ macro_rules! pat {
         Pattern {
             children: Vec::new(),
             matches: |forest, id, _| {
-                matches!(forest.result(id), Some(Value::Number(num)) if *num > 0 && *num & (num - 1) == 0).then_some(None)
+                matches!(forest.result(id), Some(Value::Number(num)) if *num > 0 && *num & (*num - 1) == 0).then_some(None)
             },
         }
     };
@@ -98,6 +98,16 @@ macro_rules! pat {
             children: vec![$($child),*],
             matches: |forest, id, _| {
                 matches!(forest.kind(id), NodeKind::Op(OpKind::$kind)).then(|| forest.result(id))
+            },
+        }
+    };
+
+    (Store($($child:expr),*) -> dst) => {
+        Pattern {
+            children: vec![$($child),*],
+            matches: |forest, id, _| {
+                matches!(forest.kind(id), NodeKind::Op(OpKind::Store))
+                    .then(|| forest.result(forest.child(id, 0)))
             },
         }
     };
@@ -195,31 +205,29 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
             dfs(forest, child, tiles, dp)
         }
 
-        let mut best = None;
+        let best = tiles
+            .iter()
+            .filter_map(|tile| {
+                tile.try_cover(forest, id).and_then(|uncovered| {
+                    let mut cost = tile.cost;
+                    let mut map = HashMap::from([(id, tile)]);
 
-        for tile in tiles {
-            let Some(uncovered) = tile.try_cover(forest, id) else {
-                continue;
-            };
+                    for child in &uncovered {
+                        cost += dp[child].cost;
+                        map.extend(dp[child].map.iter());
+                    }
 
-            let mut cost = tile.cost;
-            let mut map = HashMap::from([(id, tile)]);
+                    Some(Cover {
+                        map,
+                        cost,
+                        root: id,
+                    })
+                })
+            })
+            .min_by_key(|cover| cover.cost)
+            .expect("node should be covered");
 
-            for child in &uncovered {
-                cost += dp[child].cost;
-                map.extend(dp[child].map.iter());
-            }
-
-            if best.as_ref().map_or(true, |b: &Cover| cost < b.cost) {
-                best = Some(Cover {
-                    map,
-                    cost,
-                    root: id,
-                });
-            }
-        }
-
-        dp.insert(id, best.expect("node should be matched"));
+        dp.insert(id, best);
     }
 
     forest
@@ -767,7 +775,7 @@ pub fn isel_tiles() -> Vec<Tile> {
         pat!(Store(
             pat!(var),
             pat!(Add(pat!(Load(pat!(exact)) -> inherit), pat!(any)) -> inherit)
-        ) -> res),
+        ) -> dst),
         1,
         |forest, root| {
             vec![l2::Instruction::StoreArithmetic {
@@ -786,7 +794,7 @@ pub fn isel_tiles() -> Vec<Tile> {
         pat!(Store(
             pat!(var),
             pat!(Add(pat!(any), pat!(Load(pat!(exact)) -> inherit)) -> inherit)
-        ) -> res),
+        ) -> dst),
         1,
         |forest, root| {
             vec![l2::Instruction::StoreArithmetic {
@@ -805,7 +813,7 @@ pub fn isel_tiles() -> Vec<Tile> {
         pat!(Store(
             pat!(var),
             pat!(Sub(pat!(Load(pat!(exact)) -> inherit), pat!(any)) -> inherit)
-        ) -> res),
+        ) -> dst),
         1,
         |forest, root| {
             vec![l2::Instruction::StoreArithmetic {

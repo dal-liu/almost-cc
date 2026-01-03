@@ -153,8 +153,7 @@ impl SelectionForest {
                     Some(Value::Variable(*dst)),
                 ),
                 Store { dst, src } => {
-                    let dst = Value::Variable(*dst);
-                    forest.alloc_tree(OpKind::Store, [&dst, src], Some(dst))
+                    forest.alloc_tree(OpKind::Store, [&Value::Variable(*dst), src], None)
                 }
                 Return => forest.alloc_tree(OpKind::Return, [], None),
                 ReturnValue(val) => forest.alloc_tree(OpKind::ReturnValue, [val], None),
@@ -239,14 +238,18 @@ impl SelectionForest {
         idx1: usize,
         idx2: usize,
     ) -> bool {
-        let u = self.roots[idx1];
-        let v = self.roots[idx2];
+        let node1 = self.roots[idx1];
+        let node2 = self.roots[idx2];
 
-        let Some(Value::Variable(result)) = self.result(u) else {
+        if matches!(self.kind(node1), NodeKind::Op(OpKind::Store)) {
+            return false;
+        }
+
+        let Some(Value::Variable(result)) = self.result(node1) else {
             return false;
         };
 
-        let Some(leaf) = self.matching_leaf(v, *result) else {
+        let Some(leaf) = self.matching_leaf(node2, *result) else {
             return false;
         };
 
@@ -288,12 +291,12 @@ impl SelectionForest {
             .iter_mut()
             .find(|&&mut child| child == leaf)
         {
-            *id = u;
+            *id = node1;
         } else {
             unreachable!("leaf should exist in parent children")
         }
 
-        self.arena[u.0].parent = Some(parent);
+        self.arena[node1.0].parent = Some(parent);
         self.roots.remove(idx1);
         ctx.inst_ids.remove(idx1);
 
@@ -310,7 +313,7 @@ impl SelectionForest {
                 continue;
             }
 
-            if matches!(self.result(id), Some(Value::Variable(var)) if *var == target) {
+            if matches!(self.result(id), Some(&Value::Variable(var)) if var == target) {
                 if leaf.is_some() {
                     return None;
                 }
