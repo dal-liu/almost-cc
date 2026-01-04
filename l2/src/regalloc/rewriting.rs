@@ -35,12 +35,12 @@ pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) 
 fn rewrite_program(func: &mut Function, coloring: &ColoringResult) {
     for block in &mut func.basic_blocks {
         for inst in &mut block.instructions {
-            for var in inst
+            let vars: Vec<Value> = inst
                 .defs()
-                .into_iter()
                 .chain(inst.uses())
                 .filter(|val| matches!(val, Value::Variable(_)))
-            {
+                .collect();
+            for var in vars {
                 inst.replace_value(&var, &coloring.color[&var]);
             }
         }

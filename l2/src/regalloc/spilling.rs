@@ -17,8 +17,8 @@ pub fn spill(
     for block in &mut func.basic_blocks {
         let num_insts = block.instructions.len();
         for inst in mem::replace(&mut block.instructions, Vec::with_capacity(num_insts)) {
-            let spill_use = inst.uses().iter().any(|use_| use_ == var);
-            let spill_def = inst.defs().iter().any(|def| def == var);
+            let spill_use = inst.uses().any(|use_| &use_ == var);
+            let spill_def = inst.defs().any(|def| &def == var);
 
             let spill_var = if spill_use || spill_def {
                 let new_var =

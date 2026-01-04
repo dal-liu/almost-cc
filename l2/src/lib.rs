@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::iter;
 
 use utils::{DisplayResolved, Interner};
 
@@ -47,8 +48,11 @@ impl Register {
 
     pub const NUM_GP_REGISTERS: usize = 15;
 
-    pub fn gp_registers() -> Vec<Self> {
-        [Self::CALLER_SAVED, Self::CALLEE_SAVED].concat()
+    pub fn gp_registers() -> impl Iterator<Item = Register> {
+        [Self::CALLER_SAVED, Self::CALLEE_SAVED]
+            .into_iter()
+            .flatten()
+            .copied()
     }
 }
 
@@ -248,7 +252,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn defs(&self) -> Vec<Value> {
+    pub fn defs(&self) -> Box<dyn Iterator<Item = Value>> {
         use Instruction::*;
         use Register::*;
 
@@ -260,53 +264,53 @@ impl Instruction {
             | Shift { dst, .. }
             | LoadArithmetic { dst, .. }
             | Compare { dst, .. }
-            | LEA { dst, .. } => vec![*dst],
+            | LEA { dst, .. } => Box::new(iter::once(*dst)),
 
             Store { .. } | StoreArithmetic { .. } | CJump { .. } | Label(_) | Goto(_) | Return => {
-                Vec::new()
+                Box::new(iter::empty())
             }
 
             Call { .. } | Print | Input | Allocate | TupleError | TensorError(_) => {
                 let caller_save = [R10, R11, R8, R9, RAX, RCX, RDI, RDX, RSI];
-                caller_save.into_iter().map(Value::Register).collect()
+                Box::new(caller_save.into_iter().map(Value::Register))
             }
 
-            Increment(val) | Decrement(val) => vec![*val],
+            Increment(val) | Decrement(val) => Box::new(iter::once(*val)),
         }
     }
 
-    pub fn uses(&self) -> Vec<Value> {
+    pub fn uses(&self) -> Box<dyn Iterator<Item = Value> + '_> {
         use Instruction::*;
         use Register::*;
 
         match self {
-            Assign { src, .. } | Load { src, .. } => src
-                .is_gp_variable()
-                .then_some(vec![*src])
-                .unwrap_or_default(),
+            Assign { src, .. } | Load { src, .. } => {
+                Box::new(src.is_gp_variable().then_some(*src).into_iter())
+            }
 
             Store { dst, src, .. }
             | Arithmetic { dst, src, .. }
             | Shift { dst, src, .. }
             | StoreArithmetic { dst, src, .. }
-            | LoadArithmetic { dst, src, .. } => [dst, src]
-                .into_iter()
-                .filter_map(|&val| val.is_gp_variable().then_some(val))
-                .collect(),
+            | LoadArithmetic { dst, src, .. } => Box::new(
+                [dst, src]
+                    .into_iter()
+                    .filter(|val| val.is_gp_variable())
+                    .copied(),
+            ),
 
-            StackArg { .. } | Label(_) | Goto(_) | Input => Vec::new(),
+            StackArg { .. } | Label(_) | Goto(_) | Input => Box::new(iter::empty()),
 
-            Compare { lhs, rhs, .. } | CJump { lhs, rhs, .. } => [lhs, rhs]
-                .into_iter()
-                .filter_map(|&val| val.is_gp_variable().then_some(val))
-                .collect(),
+            Compare { lhs, rhs, .. } | CJump { lhs, rhs, .. } => Box::new(
+                [lhs, rhs]
+                    .into_iter()
+                    .filter(|val| val.is_gp_variable())
+                    .copied(),
+            ),
 
             Return => {
                 let result_and_callee_save = [RAX, R12, R13, R14, R15, RBP, RBX];
-                result_and_callee_save
-                    .into_iter()
-                    .map(Value::Register)
-                    .collect()
+                Box::new(result_and_callee_save.into_iter().map(Value::Register))
             }
 
             Call { callee, args } => {
@@ -333,18 +337,21 @@ impl Instruction {
                 if args >= 6 {
                     uses.push(Value::Register(R9));
                 }
-                uses
+                Box::new(uses.into_iter())
             }
 
-            Print => vec![Value::Register(RDI)],
+            Print => Box::new(iter::once(Value::Register(RDI))),
 
-            Allocate => vec![Value::Register(RDI), Value::Register(RSI)],
+            Allocate => Box::new([Value::Register(RDI), Value::Register(RSI)].into_iter()),
 
-            TupleError => vec![
-                Value::Register(RDI),
-                Value::Register(RSI),
-                Value::Register(RDX),
-            ],
+            TupleError => Box::new(
+                [
+                    Value::Register(RDI),
+                    Value::Register(RSI),
+                    Value::Register(RDX),
+                ]
+                .into_iter(),
+            ),
 
             TensorError(args) => {
                 let args = *args;
@@ -353,17 +360,18 @@ impl Instruction {
                     uses.push(Value::Register(RDI));
                 }
                 if args >= 3 {
-                    uses.extend_from_slice(&[Value::Register(RSI), Value::Register(RDX)]);
+                    uses.push(Value::Register(RSI));
+                    uses.push(Value::Register(RDX));
                 }
                 if args == 4 {
                     uses.push(Value::Register(RCX));
                 }
-                uses
+                Box::new(uses.into_iter())
             }
 
-            Increment(val) | Decrement(val) => vec![*val],
+            Increment(val) | Decrement(val) => Box::new(iter::once(*val)),
 
-            LEA { src, offset, .. } => vec![*src, *offset],
+            LEA { src, offset, .. } => Box::new([*src, *offset].into_iter()),
         }
     }
 

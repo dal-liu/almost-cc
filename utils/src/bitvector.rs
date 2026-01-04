@@ -91,6 +91,10 @@ impl BitVector {
             self.reset(index);
         }
     }
+
+    pub fn none(&self) -> bool {
+        !self.any()
+    }
 }
 
 impl<'a> IntoIterator for &'a BitVector {

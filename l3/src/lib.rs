@@ -174,72 +174,40 @@ impl Instruction {
         }
     }
 
-    pub fn uses(&self) -> Vec<SymbolId> {
+    pub fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_> {
         use Instruction::*;
 
+        let var = |val: &Value| match val {
+            Value::Variable(id) => Some(*id),
+            _ => None,
+        };
+
         match self {
-            Assign { src, .. } => {
-                if let Value::Variable(id) = src {
-                    vec![*id]
-                } else {
-                    vec![]
-                }
+            Assign { src, .. } => Box::new(var(src).into_iter()),
+
+            Binary { lhs, rhs, .. } | Compare { lhs, rhs, .. } => {
+                Box::new([lhs, rhs].into_iter().filter_map(var))
             }
 
-            Binary { lhs, rhs, .. } | Compare { lhs, rhs, .. } => [lhs, rhs]
-                .into_iter()
-                .filter_map(|&val| {
-                    if let Value::Variable(id) = val {
-                        Some(id)
-                    } else {
-                        None
+            Load { src, .. } => Box::new(iter::once(*src)),
+
+            Store { dst, src } => Box::new(iter::once(*dst).chain(var(src))),
+
+            Return | Label(_) | Branch(_) => Box::new(iter::empty()),
+
+            ReturnValue(val) => Box::new(var(val).into_iter()),
+
+            BranchCondition { cond, .. } => Box::new(var(cond).into_iter()),
+
+            Call { callee, args } | CallResult { callee, args, .. } => Box::new(
+                args.iter().filter_map(var).chain(
+                    match callee {
+                        Callee::Value(val) => var(val),
+                        _ => None,
                     }
-                })
-                .collect(),
-
-            Load { src, .. } => vec![*src],
-
-            Store { dst, src } => iter::once(*dst)
-                .chain(if let Value::Variable(id) = src {
-                    Some(*id)
-                } else {
-                    None
-                })
-                .collect(),
-
-            Return | Label(_) | Branch(_) => Vec::new(),
-
-            ReturnValue(val) => {
-                if let Value::Variable(id) = val {
-                    vec![*id]
-                } else {
-                    vec![]
-                }
-            }
-
-            BranchCondition { cond, .. } => {
-                if let Value::Variable(id) = cond {
-                    vec![*id]
-                } else {
-                    vec![]
-                }
-            }
-
-            Call { callee, args } | CallResult { callee, args, .. } => args
-                .iter()
-                .filter_map(|arg| {
-                    if let Value::Variable(id) = arg {
-                        Some(*id)
-                    } else {
-                        None
-                    }
-                })
-                .chain(if let Callee::Value(Value::Variable(id)) = callee {
-                    Some(*id)
-                } else {
-                    None
-                })
-                .collect(),
+                    .into_iter(),
+                ),
+            ),
         }
     }
 }

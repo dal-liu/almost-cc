@@ -22,8 +22,7 @@ impl<'a> InterferenceGraph<'a> {
         };
 
         let gp_registers: Vec<NodeId> = Register::gp_registers()
-            .iter()
-            .map(|&reg| liveness.interner[&Value::Register(reg)])
+            .map(|reg| liveness.interner[&Value::Register(reg)])
             .collect();
         for &u in &gp_registers {
             for &v in &gp_registers {
@@ -53,11 +52,7 @@ impl<'a> InterferenceGraph<'a> {
                     _ => (),
                 }
 
-                let defs: Vec<NodeId> = inst
-                    .defs()
-                    .iter()
-                    .map(|def| liveness.interner[def])
-                    .collect();
+                let defs: Vec<NodeId> = inst.defs().map(|def| liveness.interner[&def]).collect();
 
                 live.set_from(defs.iter().copied());
                 for &u in &defs {
@@ -69,7 +64,7 @@ impl<'a> InterferenceGraph<'a> {
                 }
 
                 live.reset_from(defs.iter().copied());
-                live.set_from(inst.uses().iter().map(|use_| liveness.interner[use_]));
+                live.set_from(inst.uses().map(|use_| liveness.interner[&use_]));
             }
         }
 

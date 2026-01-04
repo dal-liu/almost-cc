@@ -89,18 +89,19 @@ pub enum BinaryOp {
 
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use BinaryOp::*;
         let op = match self {
-            Self::Add => "+",
-            Self::Sub => "-",
-            Self::Mul => "*",
-            Self::BitAnd => "&",
-            Self::Shl => "<<",
-            Self::Shr => ">>",
-            Self::Lt => "<",
-            Self::Le => "<=",
-            Self::Eq => "=",
-            Self::Ge => ">=",
-            Self::Gt => ">",
+            Add => "+",
+            Sub => "-",
+            Mul => "*",
+            BitAnd => "&",
+            Shl => "<<",
+            Shr => ">>",
+            Lt => "<",
+            Le => "<=",
+            Eq => "=",
+            Ge => ">=",
+            Gt => ">",
         };
         write!(f, "{}", op)
     }
@@ -378,14 +379,8 @@ impl ControlFlowGraph {
         for block in basic_blocks {
             match &block.terminator {
                 Terminator::Branch(label) => {
-                    successors
-                        .entry(block.label)
-                        .or_insert(Vec::new())
-                        .push(*label);
-                    predecessors
-                        .entry(*label)
-                        .or_insert(Vec::new())
-                        .push(block.label);
+                    successors.entry(block.label).or_default().push(*label);
+                    predecessors.entry(*label).or_default().push(block.label);
                 }
                 Terminator::BranchCondition {
                     true_label,
@@ -394,15 +389,15 @@ impl ControlFlowGraph {
                 } => {
                     successors
                         .entry(block.label)
-                        .or_insert(Vec::new())
+                        .or_default()
                         .extend([*true_label, *false_label]);
                     predecessors
                         .entry(*true_label)
-                        .or_insert(Vec::new())
+                        .or_default()
                         .push(block.label);
                     predecessors
                         .entry(*false_label)
-                        .or_insert(Vec::new())
+                        .or_default()
                         .push(block.label);
                 }
                 _ => (),
