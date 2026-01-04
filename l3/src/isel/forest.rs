@@ -158,7 +158,7 @@ impl SelectionForest {
                 Return => forest.alloc_tree(OpKind::Return, [], None),
                 ReturnValue(val) => forest.alloc_tree(OpKind::ReturnValue, [val], None),
                 Branch(label) => forest.alloc_tree(OpKind::Branch, [&Value::Label(*label)], None),
-                BranchCond { cond, label } => {
+                BranchCondition { cond, label } => {
                     forest.alloc_tree(OpKind::BranchCond, [cond, &Value::Label(*label)], None)
                 }
                 Label(_) | Call { .. } | CallResult { .. } => {

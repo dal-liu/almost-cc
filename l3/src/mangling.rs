@@ -11,7 +11,7 @@ pub fn mangle_labels(prog: &mut Program) -> (String, u32) {
         .fold(None, |prefix, inst| match inst {
             Instruction::Label(label)
             | Instruction::Branch(label)
-            | Instruction::BranchCond { label, .. } => {
+            | Instruction::BranchCondition { label, .. } => {
                 let label = prog.interner.resolve(label.0);
                 match prefix {
                     None => Some(label.clone()),
@@ -33,7 +33,7 @@ pub fn mangle_labels(prog: &mut Program) -> (String, u32) {
                 match inst {
                     Instruction::Label(label)
                     | Instruction::Branch(label)
-                    | Instruction::BranchCond { label, .. } => {
+                    | Instruction::BranchCondition { label, .. } => {
                         let is_new = !label_to_mangled.contains_key(label);
                         *label = *label_to_mangled.entry(*label).or_insert_with(|| {
                             SymbolId(prog.interner.intern(format!("{}{}", prefix, suffix)))

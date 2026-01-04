@@ -24,30 +24,30 @@ pub enum Register {
 }
 
 impl Register {
-    pub const CALLER_SAVED: &[Register] = &[
-        Register::RAX,
-        Register::RDI,
-        Register::RSI,
-        Register::RDX,
-        Register::RCX,
-        Register::R8,
-        Register::R9,
-        Register::R10,
-        Register::R11,
+    pub const CALLER_SAVED: &[Self] = &[
+        Self::RAX,
+        Self::RDI,
+        Self::RSI,
+        Self::RDX,
+        Self::RCX,
+        Self::R8,
+        Self::R9,
+        Self::R10,
+        Self::R11,
     ];
 
-    pub const CALLEE_SAVED: &[Register] = &[
-        Register::RBX,
-        Register::RBP,
-        Register::R12,
-        Register::R13,
-        Register::R14,
-        Register::R15,
+    pub const CALLEE_SAVED: &[Self] = &[
+        Self::RBX,
+        Self::RBP,
+        Self::R12,
+        Self::R13,
+        Self::R14,
+        Self::R15,
     ];
 
     pub const NUM_GP_REGISTERS: usize = 15;
 
-    pub fn gp_registers() -> Vec<Register> {
+    pub fn gp_registers() -> Vec<Self> {
         [Self::CALLER_SAVED, Self::CALLEE_SAVED].concat()
     }
 }
@@ -89,8 +89,8 @@ pub enum Value {
 impl Value {
     pub fn is_gp_variable(&self) -> bool {
         match self {
-            Value::Variable(_) => true,
-            Value::Register(reg) if !matches!(reg, Register::RSP) => true,
+            Self::Variable(_) => true,
+            Self::Register(reg) if !matches!(reg, Register::RSP) => true,
             _ => false,
         }
     }
@@ -101,15 +101,21 @@ impl DisplayResolved for Value {
         match self {
             Self::Register(reg) => write!(f, "{}", reg),
             Self::Number(num) => write!(f, "{}", num),
-            Self::Label(label) => write!(f, ":{}", interner.resolve(label.0)),
-            Self::Function(callee) => write!(f, "@{}", interner.resolve(callee.0)),
-            Self::Variable(var) => write!(f, "%{}", interner.resolve(var.0)),
+            Self::Label(label) => write!(f, ":{}", label.resolved(interner)),
+            Self::Function(callee) => write!(f, "@{}", callee.resolved(interner)),
+            Self::Variable(var) => write!(f, "%{}", var.resolved(interner)),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, PartialOrd, Ord)]
 pub struct SymbolId(pub usize);
+
+impl DisplayResolved for SymbolId {
+    fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
+        write!(f, "{}", interner.resolve(self.0))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum ArithmeticOp {
@@ -513,10 +519,10 @@ impl DisplayResolved for Instruction {
                 lhs.resolved(interner),
                 cmp,
                 rhs.resolved(interner),
-                interner.resolve(label.0),
+                label.resolved(interner),
             ),
-            Label(label) => write!(f, ":{}", interner.resolve(label.0)),
-            Goto(label) => write!(f, "goto :{}", interner.resolve(label.0)),
+            Label(label) => write!(f, ":{}", label.resolved(interner)),
+            Goto(label) => write!(f, "goto :{}", label.resolved(interner)),
             Return => write!(f, "return"),
             Call { callee, args } => write!(f, "call {} {}", callee.resolved(interner), args),
             Print => write!(f, "call print 1"),
@@ -624,7 +630,7 @@ impl Function {
 
 impl DisplayResolved for Function {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
-        writeln!(f, "  (@{} {}", interner.resolve(self.name.0), self.args)?;
+        writeln!(f, "  (@{} {}", self.name.resolved(interner), self.args)?;
 
         for block in &self.basic_blocks {
             write!(f, "{}", block.resolved(interner))?;

@@ -4,7 +4,7 @@ use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::prelude::*;
 use l1::*;
 
-type MyExtra<'src> = extra::Err<Rich<'src, char>>;
+type L1Extra<'src> = extra::Err<Rich<'src, char>>;
 
 pub fn parse_file(file_name: &str) -> Option<Program> {
     let file_name = file_name.to_owned();
@@ -31,15 +31,15 @@ pub fn parse_file(file_name: &str) -> Option<Program> {
     output
 }
 
-fn separators<'src>() -> impl Parser<'src, &'src str, (), MyExtra<'src>> + Copy {
+fn separators<'src>() -> impl Parser<'src, &'src str, (), L1Extra<'src>> + Copy {
     one_of(" \t").repeated()
 }
 
-fn comment<'src>() -> impl Parser<'src, &'src str, (), MyExtra<'src>> {
+fn comment<'src>() -> impl Parser<'src, &'src str, (), L1Extra<'src>> {
     just("//").ignore_then(none_of('\n').repeated()).padded()
 }
 
-fn write_register<'src>() -> impl Parser<'src, &'src str, Register, MyExtra<'src>> {
+fn write_register<'src>() -> impl Parser<'src, &'src str, Register, L1Extra<'src>> {
     use Register::*;
     choice((
         arg_register(),
@@ -56,7 +56,7 @@ fn write_register<'src>() -> impl Parser<'src, &'src str, Register, MyExtra<'src
     .padded_by(separators())
 }
 
-fn arg_register<'src>() -> impl Parser<'src, &'src str, Register, MyExtra<'src>> {
+fn arg_register<'src>() -> impl Parser<'src, &'src str, Register, L1Extra<'src>> {
     use Register::*;
     choice((
         just("rdi").to(RDI),
@@ -69,11 +69,11 @@ fn arg_register<'src>() -> impl Parser<'src, &'src str, Register, MyExtra<'src>>
     .padded_by(separators())
 }
 
-fn rcx<'src>() -> impl Parser<'src, &'src str, Register, MyExtra<'src>> {
+fn rcx<'src>() -> impl Parser<'src, &'src str, Register, L1Extra<'src>> {
     just("rcx").to(Register::RCX).padded_by(separators())
 }
 
-fn value<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
+fn value<'src>() -> impl Parser<'src, &'src str, Value, L1Extra<'src>> {
     choice((
         register_or_number(),
         function_name().map(|callee| Value::Function(callee.to_owned())),
@@ -82,27 +82,27 @@ fn value<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     .padded_by(separators())
 }
 
-fn register_or_number<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
+fn register_or_number<'src>() -> impl Parser<'src, &'src str, Value, L1Extra<'src>> {
     register()
         .map(Value::Register)
         .or(number().map(Value::Number))
         .padded_by(separators())
 }
 
-fn write_or_function<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
+fn write_or_function<'src>() -> impl Parser<'src, &'src str, Value, L1Extra<'src>> {
     write_register()
         .map(Value::Register)
         .or(function_name().map(|callee| Value::Function(callee.to_owned())))
         .padded_by(separators())
 }
 
-fn register<'src>() -> impl Parser<'src, &'src str, Register, MyExtra<'src>> {
+fn register<'src>() -> impl Parser<'src, &'src str, Register, L1Extra<'src>> {
     write_register()
         .or(just("rsp").to(Register::RSP))
         .padded_by(separators())
 }
 
-fn arithmetic_op<'src>() -> impl Parser<'src, &'src str, ArithmeticOp, MyExtra<'src>> {
+fn arithmetic_op<'src>() -> impl Parser<'src, &'src str, ArithmeticOp, L1Extra<'src>> {
     choice((
         memory_arithmetic_op(),
         just("*=").to(ArithmeticOp::MulAssign),
@@ -111,7 +111,7 @@ fn arithmetic_op<'src>() -> impl Parser<'src, &'src str, ArithmeticOp, MyExtra<'
     .padded_by(separators())
 }
 
-fn shift_op<'src>() -> impl Parser<'src, &'src str, ShiftOp, MyExtra<'src>> {
+fn shift_op<'src>() -> impl Parser<'src, &'src str, ShiftOp, L1Extra<'src>> {
     choice((
         just("<<=").to(ShiftOp::ShlAssign),
         just(">>=").to(ShiftOp::ShrAssign),
@@ -119,7 +119,7 @@ fn shift_op<'src>() -> impl Parser<'src, &'src str, ShiftOp, MyExtra<'src>> {
     .padded_by(separators())
 }
 
-fn compare_op<'src>() -> impl Parser<'src, &'src str, CompareOp, MyExtra<'src>> {
+fn compare_op<'src>() -> impl Parser<'src, &'src str, CompareOp, L1Extra<'src>> {
     choice((
         just("<=").to(CompareOp::Le),
         just("<").to(CompareOp::Lt),
@@ -128,11 +128,11 @@ fn compare_op<'src>() -> impl Parser<'src, &'src str, CompareOp, MyExtra<'src>> 
     .padded_by(separators())
 }
 
-fn multiplicative_of_8<'src>() -> impl Parser<'src, &'src str, i64, MyExtra<'src>> {
+fn multiplicative_of_8<'src>() -> impl Parser<'src, &'src str, i64, L1Extra<'src>> {
     number().filter(|n| n % 8 == 0).padded_by(separators())
 }
 
-fn number<'src>() -> impl Parser<'src, &'src str, i64, MyExtra<'src>> {
+fn number<'src>() -> impl Parser<'src, &'src str, i64, L1Extra<'src>> {
     just('+')
         .to(1)
         .or(just('-').to(-1))
@@ -143,33 +143,33 @@ fn number<'src>() -> impl Parser<'src, &'src str, i64, MyExtra<'src>> {
         .padded_by(separators())
 }
 
-fn function_name<'src>() -> impl Parser<'src, &'src str, &'src str, MyExtra<'src>> {
+fn function_name<'src>() -> impl Parser<'src, &'src str, &'src str, L1Extra<'src>> {
     just('@')
         .ignore_then(text::ascii::ident())
         .padded_by(separators())
 }
 
-fn label_name<'src>() -> impl Parser<'src, &'src str, &'src str, MyExtra<'src>> {
+fn label_name<'src>() -> impl Parser<'src, &'src str, &'src str, L1Extra<'src>> {
     just(':')
         .ignore_then(text::ascii::ident())
         .padded_by(separators())
 }
 
-fn rcx_or_number<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
+fn rcx_or_number<'src>() -> impl Parser<'src, &'src str, Value, L1Extra<'src>> {
     rcx()
         .map(Value::Register)
         .or(number().map(Value::Number))
         .padded_by(separators())
 }
 
-fn memory_arithmetic_op<'src>() -> impl Parser<'src, &'src str, ArithmeticOp, MyExtra<'src>> {
+fn memory_arithmetic_op<'src>() -> impl Parser<'src, &'src str, ArithmeticOp, L1Extra<'src>> {
     just("+=")
         .to(ArithmeticOp::AddAssign)
         .or(just("-=").to(ArithmeticOp::SubAssign))
         .padded_by(separators())
 }
 
-fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src>> {
+fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, L1Extra<'src>> {
     let arrow = just("<-").padded_by(separators());
     let mem = just("mem").padded_by(separators());
     let call_keyword = just("call").padded_by(separators());
@@ -342,7 +342,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
     ))
 }
 
-fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
+fn function<'src>() -> impl Parser<'src, &'src str, Function, L1Extra<'src>> {
     just('(')
         .padded_by(comment().repeated())
         .padded()
@@ -366,7 +366,7 @@ fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
         })
 }
 
-fn program<'src>() -> impl Parser<'src, &'src str, Program, MyExtra<'src>> {
+fn program<'src>() -> impl Parser<'src, &'src str, Program, L1Extra<'src>> {
     just('(')
         .padded_by(comment().repeated())
         .padded()

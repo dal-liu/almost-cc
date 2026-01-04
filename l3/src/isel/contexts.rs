@@ -32,7 +32,7 @@ pub fn create_contexts(func: &Function) -> Vec<Context<'_>> {
                 Instruction::Return
                 | Instruction::ReturnValue(_)
                 | Instruction::Branch(_)
-                | Instruction::BranchCond { .. } => {
+                | Instruction::BranchCondition { .. } => {
                     context.inst_ids.push(i);
                     contexts.push(Context::new(block.id));
                 }

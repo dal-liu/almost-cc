@@ -24,12 +24,12 @@ impl Callee {
 impl DisplayResolved for Callee {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         match self {
-            Callee::Value(val) => write!(f, "{}", val.resolved(interner)),
-            Callee::Print => write!(f, "print"),
-            Callee::Allocate => write!(f, "allocate"),
-            Callee::Input => write!(f, "input"),
-            Callee::TupleError => write!(f, "tuple-error"),
-            Callee::TensorError => write!(f, "tensor-error"),
+            Self::Value(val) => write!(f, "{}", val.resolved(interner)),
+            Self::Print => write!(f, "print"),
+            Self::Allocate => write!(f, "allocate"),
+            Self::Input => write!(f, "input"),
+            Self::TupleError => write!(f, "tuple-error"),
+            Self::TensorError => write!(f, "tensor-error"),
         }
     }
 }
@@ -46,15 +46,21 @@ impl DisplayResolved for Value {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         match self {
             Self::Number(num) => write!(f, "{}", num),
-            Self::Label(label) => write!(f, ":{}", interner.resolve(label.0)),
-            Self::Function(callee) => write!(f, "@{}", interner.resolve(callee.0)),
-            Self::Variable(var) => write!(f, "%{}", interner.resolve(var.0)),
+            Self::Label(label) => write!(f, ":{}", label.resolved(interner)),
+            Self::Function(callee) => write!(f, "@{}", callee.resolved(interner)),
+            Self::Variable(var) => write!(f, "%{}", var.resolved(interner)),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub struct SymbolId(pub usize);
+
+impl DisplayResolved for SymbolId {
+    fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
+        write!(f, "{}", interner.resolve(self.0))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BinaryOp {
@@ -69,12 +75,12 @@ pub enum BinaryOp {
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let op = match self {
-            BinaryOp::Add => "+",
-            BinaryOp::Sub => "-",
-            BinaryOp::Mul => "*",
-            BinaryOp::BitAnd => "&",
-            BinaryOp::Shl => "<<",
-            BinaryOp::Shr => ">>",
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mul => "*",
+            Self::BitAnd => "&",
+            Self::Shl => "<<",
+            Self::Shr => ">>",
         };
         write!(f, "{}", op)
     }
@@ -132,7 +138,7 @@ pub enum Instruction {
     ReturnValue(Value),
     Label(SymbolId),
     Branch(SymbolId),
-    BranchCond {
+    BranchCondition {
         cond: Value,
         label: SymbolId,
     },
@@ -163,7 +169,7 @@ impl Instruction {
             | ReturnValue(_)
             | Label(_)
             | Branch(_)
-            | BranchCond { .. }
+            | BranchCondition { .. }
             | Call { .. } => None,
         }
     }
@@ -211,7 +217,7 @@ impl Instruction {
                 }
             }
 
-            BranchCond { cond, .. } => {
+            BranchCondition { cond, .. } => {
                 if let Value::Variable(id) = cond {
                     vec![*id]
                 } else {
@@ -245,13 +251,13 @@ impl DisplayResolved for Instruction {
             Assign { dst, src } => write!(
                 f,
                 "%{} <- {}",
-                interner.resolve(dst.0),
+                dst.resolved(interner),
                 src.resolved(interner)
             ),
             Binary { dst, lhs, op, rhs } => write!(
                 f,
                 "%{} <- {} {} {}",
-                interner.resolve(dst.0),
+                dst.resolved(interner),
                 lhs.resolved(interner),
                 op,
                 rhs.resolved(interner)
@@ -259,7 +265,7 @@ impl DisplayResolved for Instruction {
             Compare { dst, lhs, cmp, rhs } => write!(
                 f,
                 "%{} <- {} {} {}",
-                interner.resolve(dst.0),
+                dst.resolved(interner),
                 lhs.resolved(interner),
                 cmp,
                 rhs.resolved(interner),
@@ -267,24 +273,24 @@ impl DisplayResolved for Instruction {
             Load { dst, src } => write!(
                 f,
                 "%{} <- load %{}",
-                interner.resolve(dst.0),
-                interner.resolve(src.0)
+                dst.resolved(interner),
+                src.resolved(interner)
             ),
             Store { dst, src } => write!(
                 f,
                 "store %{} <- {}",
-                interner.resolve(dst.0),
+                dst.resolved(interner),
                 src.resolved(interner),
             ),
             Return => write!(f, "return"),
             ReturnValue(val) => write!(f, "return {}", val.resolved(interner)),
-            Label(label) => write!(f, ":{}", interner.resolve(label.0)),
-            Branch(label) => write!(f, "br :{}", interner.resolve(label.0)),
-            BranchCond { cond, label } => write!(
+            Label(label) => write!(f, ":{}", label.resolved(interner)),
+            Branch(label) => write!(f, "br :{}", label.resolved(interner)),
+            BranchCondition { cond, label } => write!(
                 f,
                 "br {} :{}",
                 cond.resolved(interner),
-                interner.resolve(label.0)
+                label.resolved(interner)
             ),
             Call { callee, args } => write!(
                 f,
@@ -298,7 +304,7 @@ impl DisplayResolved for Instruction {
             CallResult { dst, callee, args } => write!(
                 f,
                 "%{} <- call {}({})",
-                interner.resolve(dst.0),
+                dst.resolved(interner),
                 callee.resolved(interner),
                 args.iter()
                     .map(|arg| format!("{}", arg.resolved(interner)))
@@ -349,7 +355,7 @@ impl Function {
                 Instruction::Return
                 | Instruction::ReturnValue(_)
                 | Instruction::Branch(_)
-                | Instruction::BranchCond { .. } => {
+                | Instruction::BranchCondition { .. } => {
                     block.instructions.push(inst);
                     basic_blocks.push(BasicBlock {
                         id: BlockId(basic_blocks.len()),
@@ -395,10 +401,10 @@ impl DisplayResolved for Function {
         writeln!(
             f,
             "define @{}({}) {{",
-            interner.resolve(self.name.0),
+            self.name.resolved(interner),
             self.params
                 .iter()
-                .map(|param| format!("%{}", interner.resolve(param.0)))
+                .map(|param| format!("%{}", param.resolved(interner)))
                 .collect::<Vec<String>>()
                 .join(", ")
         )?;
@@ -431,14 +437,14 @@ impl ControlFlowGraph {
 
         let num_blocks = basic_blocks.len();
         let mut cfg = Self {
-            successors: vec![Vec::new(); num_blocks],
             predecessors: vec![Vec::new(); num_blocks],
+            successors: vec![Vec::new(); num_blocks],
         };
         let last_index = num_blocks.saturating_sub(1);
 
         for (i, block) in basic_blocks.iter().enumerate() {
             match block.instructions.last() {
-                Some(Instruction::BranchCond { label, .. }) => {
+                Some(Instruction::BranchCondition { label, .. }) => {
                     let succ = id_map[label];
                     cfg.successors[i].push(succ);
                     cfg.predecessors[succ.0].push(block.id);

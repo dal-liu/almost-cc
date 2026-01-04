@@ -19,6 +19,7 @@ function generateTests {
   return ;
 }
 
+generateTests "ir" ;
 generateTests "l3" ;
 generateTests "l2" ;
 generateTests "l1" ;

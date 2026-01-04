@@ -50,8 +50,8 @@ impl<T: Clone + Eq + Hash> Interner<T> {
         })
     }
 
-    pub fn resolve(&self, index: usize) -> &T {
-        &self.vec[index]
+    pub fn resolve(&self, idx: usize) -> &T {
+        &self.vec[idx]
     }
 
     pub fn len(&self) -> usize {

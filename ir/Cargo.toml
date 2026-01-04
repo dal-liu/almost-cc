@@ -8,3 +8,4 @@ ariadne = "0.6.0"
 chumsky = "0.12.0"
 clap = { version = "4.5.53", features = ["derive"] }
 l3 = { version = "0.1.0", path = "../l3" }
+utils = { version = "0.1.0", path = "../utils" }

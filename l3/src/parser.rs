@@ -6,7 +6,7 @@ use chumsky::prelude::*;
 use l3::*;
 use utils::Interner;
 
-type MyExtra<'src> = extra::Full<Rich<'src, char>, extra::SimpleState<Interner<String>>, ()>;
+type L3Extra<'src> = extra::Full<Rich<'src, char>, extra::SimpleState<Interner<String>>, ()>;
 
 pub fn parse_file(file_name: &str) -> Option<Program> {
     let file_name = file_name.to_owned();
@@ -36,15 +36,15 @@ pub fn parse_file(file_name: &str) -> Option<Program> {
     output
 }
 
-fn separators<'src>() -> impl Parser<'src, &'src str, (), MyExtra<'src>> + Copy {
+fn separators<'src>() -> impl Parser<'src, &'src str, (), L3Extra<'src>> + Copy {
     one_of(" \t").repeated()
 }
 
-fn comment<'src>() -> impl Parser<'src, &'src str, (), MyExtra<'src>> {
+fn comment<'src>() -> impl Parser<'src, &'src str, (), L3Extra<'src>> {
     just("//").ignore_then(none_of('\n').repeated()).padded()
 }
 
-fn callee<'src>() -> impl Parser<'src, &'src str, Callee, MyExtra<'src>> {
+fn callee<'src>() -> impl Parser<'src, &'src str, Callee, L3Extra<'src>> {
     choice((
         variable_or_function().map(Callee::Value),
         just("print").to(Callee::Print),
@@ -56,7 +56,7 @@ fn callee<'src>() -> impl Parser<'src, &'src str, Callee, MyExtra<'src>> {
     .padded_by(separators())
 }
 
-fn variables<'src>() -> impl Parser<'src, &'src str, Vec<SymbolId>, MyExtra<'src>> {
+fn variables<'src>() -> impl Parser<'src, &'src str, Vec<SymbolId>, L3Extra<'src>> {
     variable_name()
         .map_with(|name, e| SymbolId(e.state().intern(name.to_owned())))
         .separated_by(just(','))
@@ -64,14 +64,14 @@ fn variables<'src>() -> impl Parser<'src, &'src str, Vec<SymbolId>, MyExtra<'src
         .padded_by(separators())
 }
 
-fn arguments<'src>() -> impl Parser<'src, &'src str, Vec<Value>, MyExtra<'src>> {
+fn arguments<'src>() -> impl Parser<'src, &'src str, Vec<Value>, L3Extra<'src>> {
     variable_or_number()
         .separated_by(just(','))
         .collect::<Vec<Value>>()
         .padded_by(separators())
 }
 
-fn value<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
+fn value<'src>() -> impl Parser<'src, &'src str, Value, L3Extra<'src>> {
     choice((
         variable_or_number(),
         label_name()
@@ -82,14 +82,14 @@ fn value<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
     .padded_by(separators())
 }
 
-fn variable_or_number<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
+fn variable_or_number<'src>() -> impl Parser<'src, &'src str, Value, L3Extra<'src>> {
     variable_name()
         .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_owned()))))
         .or(number().map(Value::Number))
         .padded_by(separators())
 }
 
-fn variable_or_function<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'src>> {
+fn variable_or_function<'src>() -> impl Parser<'src, &'src str, Value, L3Extra<'src>> {
     variable_name()
         .map_with(|var, e| Value::Variable(SymbolId(e.state().intern(var.to_owned()))))
         .or(function_name()
@@ -97,7 +97,7 @@ fn variable_or_function<'src>() -> impl Parser<'src, &'src str, Value, MyExtra<'
         .padded_by(separators())
 }
 
-fn binary_op<'src>() -> impl Parser<'src, &'src str, BinaryOp, MyExtra<'src>> {
+fn binary_op<'src>() -> impl Parser<'src, &'src str, BinaryOp, L3Extra<'src>> {
     choice((
         just('+').to(BinaryOp::Add),
         just('-').to(BinaryOp::Sub),
@@ -109,7 +109,7 @@ fn binary_op<'src>() -> impl Parser<'src, &'src str, BinaryOp, MyExtra<'src>> {
     .padded_by(separators())
 }
 
-fn compare_op<'src>() -> impl Parser<'src, &'src str, CompareOp, MyExtra<'src>> {
+fn compare_op<'src>() -> impl Parser<'src, &'src str, CompareOp, L3Extra<'src>> {
     choice((
         just("<=").to(CompareOp::Le),
         just(">=").to(CompareOp::Ge),
@@ -120,7 +120,7 @@ fn compare_op<'src>() -> impl Parser<'src, &'src str, CompareOp, MyExtra<'src>> 
     .padded_by(separators())
 }
 
-fn number<'src>() -> impl Parser<'src, &'src str, i64, MyExtra<'src>> {
+fn number<'src>() -> impl Parser<'src, &'src str, i64, L3Extra<'src>> {
     just('+')
         .to(1)
         .or(just('-').to(-1))
@@ -131,25 +131,25 @@ fn number<'src>() -> impl Parser<'src, &'src str, i64, MyExtra<'src>> {
         .padded_by(separators())
 }
 
-fn function_name<'src>() -> impl Parser<'src, &'src str, &'src str, MyExtra<'src>> {
+fn function_name<'src>() -> impl Parser<'src, &'src str, &'src str, L3Extra<'src>> {
     just('@')
         .ignore_then(text::ascii::ident())
         .padded_by(separators())
 }
 
-fn label_name<'src>() -> impl Parser<'src, &'src str, &'src str, MyExtra<'src>> {
+fn label_name<'src>() -> impl Parser<'src, &'src str, &'src str, L3Extra<'src>> {
     just(':')
         .ignore_then(text::ascii::ident())
         .padded_by(separators())
 }
 
-fn variable_name<'src>() -> impl Parser<'src, &'src str, &'src str, MyExtra<'src>> {
+fn variable_name<'src>() -> impl Parser<'src, &'src str, &'src str, L3Extra<'src>> {
     just('%')
         .ignore_then(text::ascii::ident())
         .padded_by(separators())
 }
 
-fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src>> {
+fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, L3Extra<'src>> {
     let arrow = just("<-").padded_by(separators());
     let call_keyword = just("call").padded_by(separators());
     let return_keyword = just("return").padded_by(separators());
@@ -220,10 +220,10 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
             Instruction::Branch(SymbolId(e.state().intern(label.to_owned())))
         }));
 
-    let branch_cond = br_keyword
+    let branch_condition = br_keyword
         .ignore_then(variable_or_number())
         .then(label_name())
-        .map_with(|(cond, label), e| Instruction::BranchCond {
+        .map_with(|(cond, label), e| Instruction::BranchCondition {
             cond,
             label: SymbolId(e.state().intern(label.to_owned())),
         });
@@ -257,13 +257,13 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, MyExtra<'src
         return_inst,
         label_inst,
         branch,
-        branch_cond,
+        branch_condition,
         call_inst,
         call_result,
     ))
 }
 
-fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
+fn function<'src>() -> impl Parser<'src, &'src str, Function, L3Extra<'src>> {
     just("define")
         .padded_by(separators())
         .ignore_then(function_name())
@@ -289,7 +289,7 @@ fn function<'src>() -> impl Parser<'src, &'src str, Function, MyExtra<'src>> {
         })
 }
 
-fn program<'src>() -> impl Parser<'src, &'src str, Program, MyExtra<'src>> {
+fn program<'src>() -> impl Parser<'src, &'src str, Program, L3Extra<'src>> {
     function()
         .padded_by(comment().repeated())
         .padded()
