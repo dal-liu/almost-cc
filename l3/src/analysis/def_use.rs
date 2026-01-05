@@ -9,12 +9,12 @@ use crate::analysis::ReachingDefResult;
 
 #[derive(Debug)]
 pub struct DefUseChain<'a, 'b> {
-    interner: &'a Interner<Instruction>,
-    users: Vec<HashSet<&'b Instruction>>,
+    interner: &'b Interner<Instruction>,
+    users: Vec<HashSet<&'a Instruction>>,
 }
 
 impl<'a, 'b> DefUseChain<'a, 'b> {
-    pub fn new(func: &'b Function, reaching_def: &'a ReachingDefResult) -> Self {
+    pub fn new(func: &'a Function, reaching_def: &'b ReachingDefResult) -> Self {
         let interner = &reaching_def.interner;
         let num_insts = interner.len();
         let mut users = vec![HashSet::new(); num_insts];
