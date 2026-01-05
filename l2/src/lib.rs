@@ -314,30 +314,18 @@ impl Instruction {
             }
 
             Call { callee, args } => {
-                let args = *args;
-                let mut uses = Vec::new();
+                let mut uses = [None; 7];
+                let call_arguments = [RDI, RSI, RDX, RCX, R8, R9];
+                for (i, reg) in call_arguments.into_iter().enumerate() {
+                    if *args <= i as i64 {
+                        break;
+                    }
+                    uses[i] = Some(Value::Register(reg));
+                }
                 if callee.is_gp_variable() {
-                    uses.push(*callee);
+                    uses[6] = Some(*callee);
                 }
-                if args >= 1 {
-                    uses.push(Value::Register(RDI));
-                }
-                if args >= 2 {
-                    uses.push(Value::Register(RSI));
-                }
-                if args >= 3 {
-                    uses.push(Value::Register(RDX));
-                }
-                if args >= 4 {
-                    uses.push(Value::Register(RCX));
-                }
-                if args >= 5 {
-                    uses.push(Value::Register(R8));
-                }
-                if args >= 6 {
-                    uses.push(Value::Register(R9));
-                }
-                Box::new(uses.into_iter())
+                Box::new(uses.into_iter().flatten())
             }
 
             Print => Box::new(iter::once(Value::Register(RDI))),
@@ -354,19 +342,15 @@ impl Instruction {
             ),
 
             TensorError(args) => {
-                let args = *args;
-                let mut uses = Vec::new();
-                if args >= 1 {
-                    uses.push(Value::Register(RDI));
+                let mut uses = [None; 4];
+                let tensor_error_arguments = [RDI, RSI, RDX, RCX];
+                for (i, reg) in tensor_error_arguments.into_iter().enumerate() {
+                    if *args <= i as u8 {
+                        break;
+                    }
+                    uses[i] = Some(Value::Register(reg));
                 }
-                if args >= 3 {
-                    uses.push(Value::Register(RSI));
-                    uses.push(Value::Register(RDX));
-                }
-                if args == 4 {
-                    uses.push(Value::Register(RCX));
-                }
-                Box::new(uses.into_iter())
+                Box::new(uses.into_iter().flatten())
             }
 
             Increment(val) | Decrement(val) => Box::new(iter::once(*val)),

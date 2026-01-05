@@ -1,7 +1,9 @@
+mod analysis;
 mod parser;
 
 use clap::Parser;
 
+use crate::analysis::{DominanceFrontier, DominatorTree};
 use crate::parser::parse_file;
 
 #[derive(Parser)]
@@ -20,6 +22,12 @@ fn main() {
     if let Some(prog) = parse_file(&cli.source) {
         if cli.verbose {
             print!("{}", &prog);
+        }
+
+        for func in &prog.functions {
+            let dom_tree = DominatorTree::new(func);
+            let dom_frontier = DominanceFrontier::new(func, &dom_tree);
+            dbg!(&dom_frontier);
         }
     }
 }

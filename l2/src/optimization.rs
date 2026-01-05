@@ -1,3 +1,3 @@
 mod peephole;
 
-pub use crate::optimization::peephole::run_peephole_passes;
+pub use peephole::run_peephole_passes;

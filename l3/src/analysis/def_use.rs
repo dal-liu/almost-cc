@@ -8,13 +8,13 @@ use utils::{DisplayResolved, Interner};
 use crate::analysis::ReachingDefResult;
 
 #[derive(Debug)]
-pub struct DefUseChain<'a> {
+pub struct DefUseChain<'a, 'b> {
     interner: &'a Interner<Instruction>,
-    users: Vec<HashSet<&'a Instruction>>,
+    users: Vec<HashSet<&'b Instruction>>,
 }
 
-impl<'a> DefUseChain<'a> {
-    pub fn new(func: &'a Function, reaching_def: &'a ReachingDefResult) -> Self {
+impl<'a, 'b> DefUseChain<'a, 'b> {
+    pub fn new(func: &'b Function, reaching_def: &'a ReachingDefResult) -> Self {
         let interner = &reaching_def.interner;
         let num_insts = interner.len();
         let mut users = vec![HashSet::new(); num_insts];
@@ -40,7 +40,7 @@ impl<'a> DefUseChain<'a> {
     }
 }
 
-impl DisplayResolved for DefUseChain<'_> {
+impl DisplayResolved for DefUseChain<'_, '_> {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         let mut lines: Vec<String> = self
             .users

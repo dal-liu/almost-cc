@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
+use std::iter;
 
 use utils::{DisplayResolved, Interner};
 
@@ -408,6 +409,14 @@ impl ControlFlowGraph {
             predecessors,
             successors,
         }
+    }
+
+    pub fn predecessors(&self, label: SymbolId) -> impl Iterator<Item = SymbolId> {
+        self.predecessors.get(&label).into_iter().flatten().copied()
+    }
+
+    pub fn successors(&self, label: SymbolId) -> impl Iterator<Item = SymbolId> {
+        self.successors.get(&label).into_iter().flatten().copied()
     }
 }
 
