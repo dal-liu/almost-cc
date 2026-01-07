@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
-use std::iter;
 
 use utils::{DisplayResolved, Interner};
 
@@ -64,7 +63,7 @@ impl DisplayResolved for Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SymbolId(pub usize);
 
 impl DisplayResolved for SymbolId {
@@ -162,8 +161,28 @@ pub enum Instruction {
     },
     PhiNode {
         dst: SymbolId,
-        vals: Vec<(Value, SymbolId)>,
+        vals: Vec<PhiValue>,
     },
+}
+
+impl Instruction {
+    pub fn defs(&self) -> Option<SymbolId> {
+        use Instruction::*;
+
+        match self {
+            Define { .. } | Insert { .. } | Call { .. } => None,
+
+            Assign { dst, .. }
+            | Binary { dst, .. }
+            | Extract { dst, .. }
+            | ArrayLength { dst, .. }
+            | TupleLength { dst, .. }
+            | CallResult { dst, .. }
+            | NewArray { dst, .. }
+            | NewTuple { dst, .. }
+            | PhiNode { dst, .. } => Some(*dst),
+        }
+    }
 }
 
 impl DisplayResolved for Instruction {
@@ -261,15 +280,28 @@ impl DisplayResolved for Instruction {
                 "%{} <- phi {}",
                 dst.resolved(interner),
                 vals.iter()
-                    .map(|(val, label)| format!(
-                        "[{} :{}]",
-                        val.resolved(interner),
-                        label.resolved(interner)
-                    ))
+                    .map(|phi_val| format!("{}", phi_val.resolved(interner)))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct PhiValue {
+    pub val: Value,
+    pub label: SymbolId,
+}
+
+impl DisplayResolved for PhiValue {
+    fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
+        write!(
+            f,
+            "[{}, :{}]",
+            self.val.resolved(interner),
+            self.label.resolved(interner)
+        )
     }
 }
 

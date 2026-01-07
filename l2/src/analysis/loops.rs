@@ -73,10 +73,10 @@ impl LoopForest {
                 block_map.entry(id).or_insert(i);
             }
 
-            let (first, second) = merged_loops.split_at_mut(i + 1);
-            let loop_header = first[i].header;
+            let (left, right) = merged_loops.split_at_mut(i + 1);
+            let loop_header = left[i].header;
 
-            let parent = second.iter_mut().find(|other| {
+            let parent = right.iter_mut().find(|other| {
                 dominators.dominates(other.header, loop_header)
                     && other.basic_blocks.contains(&loop_header)
             });

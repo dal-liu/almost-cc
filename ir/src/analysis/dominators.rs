@@ -115,8 +115,8 @@ impl DominatorTree {
 
 #[derive(Debug)]
 pub struct DominanceFrontier<'a> {
-    interner: &'a Interner<SymbolId>,
-    frontier: Vec<BitVector>,
+    pub interner: &'a Interner<SymbolId>,
+    pub frontier: Vec<BitVector>,
 }
 
 impl<'a> DominanceFrontier<'a> {
@@ -127,7 +127,7 @@ impl<'a> DominanceFrontier<'a> {
         let mut local_frontier = vec![BitVector::new(num_blocks); num_blocks];
         for (i, block) in func.basic_blocks.iter().enumerate() {
             for succ in func.cfg.successors(block.label) {
-                if !dom_tree.dominates(block.label, succ) {
+                if block.label == succ || !dom_tree.dominates(block.label, succ) {
                     local_frontier[i].set(interner[&succ]);
                 }
             }
@@ -147,8 +147,13 @@ impl<'a> DominanceFrontier<'a> {
                 dfs(dom_tree, child, local_frontier, frontier);
 
                 if dom_tree.idom[child] != Some(id) {
-                    let frontier_clone = frontier[child].clone();
-                    frontier[id].set_from(frontier_clone.iter());
+                    if id < child {
+                        let (left, right) = frontier.split_at_mut(child);
+                        left[id].set_from(right[0].iter());
+                    } else {
+                        let (left, right) = frontier.split_at_mut(id);
+                        right[0].set_from(left[child].iter());
+                    }
                 }
             }
         }

@@ -1,10 +1,12 @@
 mod analysis;
 mod parser;
+mod ssa;
 
 use clap::Parser;
+use utils::DisplayResolved;
 
-use crate::analysis::{DominanceFrontier, DominatorTree};
 use crate::parser::parse_file;
+use crate::ssa::construct_ssa_form;
 
 #[derive(Parser)]
 struct Cli {
@@ -19,15 +21,14 @@ struct Cli {
 
 fn main() {
     let cli = Cli::parse();
-    if let Some(prog) = parse_file(&cli.source) {
+    if let Some(mut prog) = parse_file(&cli.source) {
         if cli.verbose {
             print!("{}", &prog);
         }
 
-        for func in &prog.functions {
-            let dom_tree = DominatorTree::new(func);
-            let dom_frontier = DominanceFrontier::new(func, &dom_tree);
-            dbg!(&dom_frontier);
+        for func in &mut prog.functions {
+            construct_ssa_form(func);
+            println!("{}", func.resolved(&prog.interner));
         }
     }
 }
