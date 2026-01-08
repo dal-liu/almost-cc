@@ -3,7 +3,6 @@ mod parser;
 mod ssa;
 
 use clap::Parser;
-use utils::DisplayResolved;
 
 use crate::parser::parse_file;
 use crate::ssa::construct_ssa_form;
@@ -26,9 +25,7 @@ fn main() {
             print!("{}", &prog);
         }
 
-        for func in &mut prog.functions {
-            construct_ssa_form(func);
-            println!("{}", func.resolved(&prog.interner));
-        }
+        construct_ssa_form(&mut prog);
+        println!("{}", &prog);
     }
 }
