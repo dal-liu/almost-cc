@@ -214,18 +214,18 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
             self.color.insert(node, self.color[&self.get_alias(node)]);
         }
 
-        let value_interner = self.interference.interner;
+        let interner = self.interference.interner;
 
         let color = self
             .color
             .iter()
-            .map(|(&u, &v)| (*value_interner.resolve(u), *value_interner.resolve(v)))
+            .map(|(&u, &v)| (*interner.resolve(u), *interner.resolve(v)))
             .collect();
 
         let spill_nodes = self
             .spill_nodes
             .iter()
-            .map(|&n| *value_interner.resolve(n))
+            .map(|&n| *interner.resolve(n))
             .collect();
 
         ColoringResult { color, spill_nodes }
@@ -298,11 +298,11 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
 
     fn coalesce(&mut self) {
         if let Some(move_) = self.worklist_moves.iter().next() {
-            let value_interner = self.interference.interner;
+            let interner = self.interference.interner;
 
             if let Instruction::Assign { dst, src } = self.interner.resolve(move_) {
-                let x = self.get_alias(value_interner[dst]);
-                let y = self.get_alias(value_interner[src]);
+                let x = self.get_alias(interner[dst]);
+                let y = self.get_alias(interner[src]);
 
                 let (u, v) = if self.precolored.contains(&y) {
                     (y, x)

@@ -15,9 +15,9 @@ pub struct InterferenceGraph<'a> {
 
 impl<'a> InterferenceGraph<'a> {
     pub fn new(func: &Function, liveness: &'a LivenessResult) -> Self {
-        let num_gp_variables = liveness.interner.len();
+        let num_gp_vars = liveness.interner.len();
         let mut graph = Self {
-            graph: vec![BitVector::new(num_gp_variables); num_gp_variables],
+            graph: vec![BitVector::new(num_gp_vars); num_gp_vars],
             interner: &liveness.interner,
         };
 

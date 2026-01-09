@@ -181,7 +181,7 @@ impl CodeGenerator {
                 Callee::TensorError => l2::Instruction::TensorError(num_args as u8),
             };
 
-            if !callee.is_libcall() {
+            if matches!(callee, Callee::Value(_)) {
                 let l2_id = l2::SymbolId(interner.intern(format!("{}{}", prefix, suffix)));
                 *suffix += 1;
 

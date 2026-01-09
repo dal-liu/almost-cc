@@ -652,8 +652,8 @@ impl ControlFlowGraph {
 
         let num_blocks = basic_blocks.len();
         let mut cfg = Self {
-            successors: vec![Vec::new(); num_blocks],
-            predecessors: vec![Vec::new(); num_blocks],
+            successors: vec![vec![]; num_blocks],
+            predecessors: vec![vec![]; num_blocks],
         };
         let last_index = num_blocks.saturating_sub(1);
 

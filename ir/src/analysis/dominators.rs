@@ -106,10 +106,12 @@ impl DominatorTree {
         }
     }
 
-    pub fn dominates(&self, u: SymbolId, v: SymbolId) -> bool {
-        let u = self.interner[&u];
-        let v = self.interner[&v];
+    pub fn dominates(&self, u: BlockId, v: BlockId) -> bool {
         self.preorder[u] <= self.preorder[v] && self.postorder[u] >= self.postorder[v]
+    }
+
+    pub fn children(&self, node: BlockId) -> impl Iterator<Item = BlockId> {
+        self.children[node].iter()
     }
 }
 
@@ -126,9 +128,11 @@ impl<'a> DominanceFrontier<'a> {
 
         let mut local_frontier = vec![BitVector::new(num_blocks); num_blocks];
         for (i, block) in func.basic_blocks.iter().enumerate() {
+            let u = interner[&block.label];
             for succ in func.cfg.successors(block.label) {
-                if block.label == succ || !dom_tree.dominates(block.label, succ) {
-                    local_frontier[i].set(interner[&succ]);
+                let v = interner[&succ];
+                if u == v || !dom_tree.dominates(u, v) {
+                    local_frontier[i].set(v);
                 }
             }
         }

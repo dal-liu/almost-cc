@@ -15,12 +15,6 @@ pub enum Callee {
     TensorError,
 }
 
-impl Callee {
-    pub fn is_libcall(&self) -> bool {
-        !matches!(self, Callee::Value(_))
-    }
-}
-
 impl DisplayResolved for Callee {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         match self {
@@ -199,15 +193,12 @@ impl Instruction {
 
             BranchCondition { cond, .. } => Box::new(var(cond).into_iter()),
 
-            Call { callee, args } | CallResult { callee, args, .. } => Box::new(
-                args.iter().filter_map(var).chain(
-                    match callee {
-                        Callee::Value(val) => var(val),
-                        _ => None,
-                    }
-                    .into_iter(),
-                ),
-            ),
+            Call { callee, args } | CallResult { callee, args, .. } => {
+                Box::new(args.iter().filter_map(var).chain(match callee {
+                    Callee::Value(val) => var(val),
+                    _ => None,
+                }))
+            }
         }
     }
 }
@@ -405,8 +396,8 @@ impl ControlFlowGraph {
 
         let num_blocks = basic_blocks.len();
         let mut cfg = Self {
-            predecessors: vec![Vec::new(); num_blocks],
-            successors: vec![Vec::new(); num_blocks],
+            predecessors: vec![vec![]; num_blocks],
+            successors: vec![vec![]; num_blocks],
         };
         let last_index = num_blocks.saturating_sub(1);
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
+use std::iter;
 
 use utils::{DisplayResolved, Interner};
 
@@ -181,6 +182,46 @@ impl Instruction {
             | NewArray { dst, .. }
             | NewTuple { dst, .. }
             | PhiNode { dst, .. } => Some(*dst),
+        }
+    }
+
+    pub fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_> {
+        use Instruction::*;
+
+        let var = |val: &Value| match val {
+            Value::Variable(id) => Some(*id),
+            _ => None,
+        };
+
+        match self {
+            Define { var, .. } => Box::new(iter::once(*var)),
+
+            Assign { src, .. } => Box::new(var(src).into_iter()),
+
+            Binary { lhs, rhs, .. } => Box::new([lhs, rhs].into_iter().filter_map(var)),
+
+            Extract { src, idxs, .. } => {
+                Box::new(iter::once(*src).chain(idxs.iter().filter_map(var)))
+            }
+
+            Insert { idxs, src, .. } => Box::new(idxs.iter().filter_map(var).chain(var(src))),
+
+            ArrayLength { src, dim, .. } => Box::new(iter::once(*src).chain(var(dim))),
+
+            TupleLength { src, .. } => Box::new(iter::once(*src)),
+
+            Call { callee, args } | CallResult { callee, args, .. } => {
+                Box::new(args.iter().filter_map(var).chain(match callee {
+                    Callee::Value(val) => var(val),
+                    _ => None,
+                }))
+            }
+
+            NewArray { dims, .. } => Box::new(dims.iter().filter_map(var)),
+
+            NewTuple { len, .. } => Box::new(var(len).into_iter()),
+
+            PhiNode { vals, .. } => Box::new(vals.iter().filter_map(move |val| var(&val.val))),
         }
     }
 }

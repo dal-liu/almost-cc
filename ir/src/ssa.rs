@@ -5,6 +5,8 @@ use utils::{BitVector, Interner};
 
 use crate::analysis::{DominanceFrontier, DominatorTree};
 
+type BlockId = usize;
+
 pub fn construct_ssa_form(prog: &mut Program) {
     for func in &mut prog.functions {
         let dom_tree = DominatorTree::new(func);
@@ -88,9 +90,40 @@ fn place_phi_nodes(
 
 fn rename_variables(
     func: &mut Function,
-    interner: &mut Interner<String>,
+    string_interner: &mut Interner<String>,
     dom_tree: &DominatorTree,
     def_blocks: &BTreeMap<SymbolId, BitVector>,
+) {
+    let var_id_interner = def_blocks
+        .keys()
+        .fold(Interner::new(), |mut interner, &def| {
+            interner.intern(def);
+            interner
+        });
+
+    let num_vars = var_id_interner.len();
+    let mut counters = vec![0; num_vars];
+    let mut stacks = vec![vec![]; num_vars];
+
+    search(
+        func,
+        string_interner,
+        dom_tree,
+        &var_id_interner,
+        &mut counters,
+        &mut stacks,
+        0,
+    );
+}
+
+fn search(
+    func: &mut Function,
+    string_interner: &mut Interner<String>,
+    dom_tree: &DominatorTree,
+    var_id_interner: &Interner<SymbolId>,
+    counters: &mut Vec<u32>,
+    stacks: &mut Vec<Vec<u32>>,
+    node: BlockId,
 ) {
     todo!()
 }
