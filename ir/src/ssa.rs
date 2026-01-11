@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use ir::*;
 use utils::{BitVector, Interner};
 
@@ -9,34 +7,41 @@ pub fn construct_ssa_form(prog: &mut Program) {
     for func in &mut prog.functions {
         let dom_tree = DominatorTree::new(func);
         let dom_front = DominanceFrontier::new(func, &dom_tree);
-        let mut def_blocks = BTreeMap::new();
 
-        let mut set_def = |def, idx| {
-            def_blocks
-                .entry(def)
-                .or_insert(BitVector::new(func.basic_blocks.len()))
-                .set(idx);
-        };
+        let interner = func
+            .params
+            .iter()
+            .map(|param| param.var)
+            .chain(
+                func.basic_blocks
+                    .iter()
+                    .flat_map(|block| block.instructions.iter().filter_map(|inst| inst.defs())),
+            )
+            .fold(Interner::new(), |mut interner, def| {
+                interner.intern(def);
+                interner
+            });
 
+        let mut def_blocks = vec![BitVector::new(func.basic_blocks.len()); interner.len()];
         for param in &func.params {
-            set_def(param.var, 0);
+            def_blocks[interner[&param.var]].set(0);
         }
-
         for (i, block) in func.basic_blocks.iter().enumerate() {
             for def in block.instructions.iter().filter_map(|inst| inst.defs()) {
-                set_def(def, i);
+                def_blocks[interner[&def]].set(i);
             }
         }
 
-        place_phi_nodes(func, &dom_front, &def_blocks);
-        rename_variables(func, &mut prog.interner, &dom_tree, &def_blocks);
+        place_phi_nodes(func, &dom_front, &interner, &def_blocks);
+        rename_variables(func, &mut prog.interner, &dom_tree, &interner);
     }
 }
 
 fn place_phi_nodes(
     func: &mut Function,
     dom_front: &DominanceFrontier,
-    def_blocks: &BTreeMap<SymbolId, BitVector>,
+    interner: &Interner<SymbolId>,
+    def_blocks: &[BitVector],
 ) {
     let num_blocks = func.basic_blocks.len();
     let mut iter_count = 0;
@@ -44,7 +49,8 @@ fn place_phi_nodes(
     let mut work = vec![0; num_blocks];
     let mut has_already = vec![0; num_blocks];
 
-    for (&dst, blocks) in def_blocks {
+    for (i, blocks) in def_blocks.iter().enumerate() {
+        let dst = *interner.resolve(i);
         iter_count += 1;
 
         for node in blocks {
@@ -87,29 +93,19 @@ fn rename_variables(
     func: &mut Function,
     string_interner: &mut Interner<String>,
     dom_tree: &DominatorTree,
-    def_blocks: &BTreeMap<SymbolId, BitVector>,
+    var_id_interner: &Interner<SymbolId>,
 ) {
-    let var_id_interner = func
-        .params
-        .iter()
-        .map(|param| &param.var)
-        .chain(def_blocks.keys())
-        .fold(Interner::new(), |mut interner, &def| {
-            interner.intern(def);
-            interner
-        });
-
     let num_vars = var_id_interner.len();
     let mut counter = vec![0; num_vars];
     let mut stack = vec![vec![]; num_vars];
 
     for param in &mut func.params {
-        let var = &mut param.var;
-        let idx = var_id_interner[var];
-        let i = counter[idx];
-        *var = SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(idx), i)));
-        stack[idx].push(i);
-        counter[idx] += 1;
+        let v = var_id_interner[&param.var];
+        let i = counter[v];
+        param.var =
+            SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(v), i)));
+        stack[v].push(i);
+        counter[v] += 1;
     }
 
     search(
@@ -132,30 +128,57 @@ fn search(
     stack: &mut Vec<Vec<u32>>,
     node: BlockId,
 ) {
+    let block = &mut func.basic_blocks[node.0];
     let mut old_lhs = Vec::new();
-    let mut new_var = |idx, suffix| {
-        SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(idx), suffix)))
+
+    let mut new_var = |old_var: SymbolId, i: u32| {
+        SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(old_var.0), i)))
     };
 
-    for inst in func.basic_blocks[node.0].instructions.iter_mut() {
-        for use_ in inst.uses().collect::<Vec<SymbolId>>() {
-            let idx = var_id_interner[&use_];
-            let i = *stack[idx].last().expect("stack should not be empty");
-            inst.replace_use(use_, new_var(idx, i));
+    for inst in block.instructions.iter_mut() {
+        if !matches!(inst, Instruction::PhiNode { .. }) {
+            for use_ in inst.uses().collect::<Vec<SymbolId>>() {
+                let v = var_id_interner[&use_];
+                let i = *stack[v].last().expect("stack should not be empty");
+                inst.replace_use(use_, new_var(use_, i));
+            }
         }
 
         if let Some(def) = inst.defs() {
-            let idx = var_id_interner[&def];
-            let i = counter[idx];
-            inst.replace_def(new_var(idx, i));
-            stack[idx].push(i);
-            counter[idx] += 1;
-            old_lhs.push(idx);
+            let v = var_id_interner[&def];
+            let i = counter[v];
+            inst.replace_def(new_var(def, i));
+            stack[v].push(i);
+            counter[v] += 1;
+            old_lhs.push(v);
         }
     }
 
+    let term = &mut block.terminator;
+    if let Some(use_) = term.uses() {
+        let v = var_id_interner[&use_];
+        let i = *stack[v].last().expect("stack should not be empty");
+        term.replace_use(new_var(use_, i));
+    }
+
+    let label = block.label;
     for succ in &func.cfg.successors[node.0] {
-        // TODO: this
+        for inst in func.basic_blocks[succ.0].instructions.iter_mut() {
+            match inst {
+                Instruction::PhiNode { vals, .. } => {
+                    let val = vals
+                        .iter_mut()
+                        .find(|val| val.label == label)
+                        .expect("phi node should have value from predecessor");
+                    if let Value::Variable(var) = &mut val.val {
+                        let v = var_id_interner[var];
+                        let i = *stack[v].last().expect("stack should not be empty");
+                        *var = new_var(*var, i);
+                    }
+                }
+                _ => (),
+            }
+        }
     }
 
     for child in dom_tree.children(node) {
@@ -170,7 +193,7 @@ fn search(
         );
     }
 
-    for &idx in &old_lhs {
-        stack[idx].pop();
+    for v in old_lhs {
+        stack[v].pop();
     }
 }

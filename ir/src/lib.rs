@@ -252,13 +252,13 @@ impl Instruction {
     pub fn replace_use(&mut self, old: SymbolId, new: SymbolId) {
         use Instruction::*;
 
-        let replace_value = |val: &mut Value| {
+        let replace_val = |val: &mut Value| {
             if matches!(val, Value::Variable(var) if *var == old) {
                 *val = Value::Variable(new);
             }
         };
 
-        let replace_variable = |var: &mut SymbolId| {
+        let replace_var = |var: &mut SymbolId| {
             if *var == old {
                 *var = new;
             }
@@ -267,55 +267,55 @@ impl Instruction {
         match self {
             Define { .. } => (),
 
-            Assign { src, .. } => replace_value(src),
+            Assign { src, .. } => replace_val(src),
 
             Binary { lhs, rhs, .. } => {
-                replace_value(lhs);
-                replace_value(rhs);
+                replace_val(lhs);
+                replace_val(rhs);
             }
 
             Extract { src, idxs, .. } => {
-                replace_variable(src);
+                replace_var(src);
                 for idx in idxs {
-                    replace_value(idx);
+                    replace_val(idx);
                 }
             }
 
             Insert { dst, idxs, src } => {
-                replace_variable(dst);
+                replace_var(dst);
                 for idx in idxs {
-                    replace_value(idx);
+                    replace_val(idx);
                 }
-                replace_value(src);
+                replace_val(src);
             }
 
             ArrayLength { src, dim, .. } => {
-                replace_variable(src);
-                replace_value(dim);
+                replace_var(src);
+                replace_val(dim);
             }
 
-            TupleLength { src, .. } => replace_variable(src),
+            TupleLength { src, .. } => replace_var(src),
 
             Call { callee, args } | CallResult { callee, args, .. } => {
                 if let Callee::Value(val) = callee {
-                    replace_value(val);
+                    replace_val(val);
                 }
                 for arg in args {
-                    replace_value(arg);
+                    replace_val(arg);
                 }
             }
 
             NewArray { dims, .. } => {
                 for dim in dims {
-                    replace_value(dim);
+                    replace_val(dim);
                 }
             }
 
-            NewTuple { len, .. } => replace_value(len),
+            NewTuple { len, .. } => replace_val(len),
 
             PhiNode { vals, .. } => {
                 for val in vals {
-                    replace_value(&mut val.val);
+                    replace_val(&mut val.val);
                 }
             }
         }
@@ -452,6 +452,35 @@ pub enum Terminator {
     },
     Return,
     ReturnValue(Value),
+}
+
+impl Terminator {
+    pub fn uses(&self) -> Option<SymbolId> {
+        let var = |val: &Value| match val {
+            Value::Variable(var) => Some(*var),
+            _ => None,
+        };
+
+        match self {
+            Self::Branch(_) | Self::Return => None,
+            Self::BranchCondition { cond, .. } => var(cond),
+            Self::ReturnValue(val) => var(val),
+        }
+    }
+
+    pub fn replace_use(&mut self, new: SymbolId) {
+        let replace_val = |val: &mut Value| {
+            if let Value::Variable(var) = val {
+                *var = new;
+            }
+        };
+
+        match self {
+            Self::Branch(_) | Self::Return => (),
+            Self::BranchCondition { cond, .. } => replace_val(cond),
+            Self::ReturnValue(val) => replace_val(val),
+        }
+    }
 }
 
 impl DisplayResolved for Terminator {
