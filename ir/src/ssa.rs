@@ -5,14 +5,12 @@ use utils::{BitVector, Interner};
 
 use crate::analysis::{DominanceFrontier, DominatorTree};
 
-type BlockId = usize;
-
 pub fn construct_ssa_form(prog: &mut Program) {
     for func in &mut prog.functions {
         let dom_tree = DominatorTree::new(func);
         let dom_front = DominanceFrontier::new(func, &dom_tree);
-
         let mut def_blocks = BTreeMap::new();
+
         let mut set_def = |def, idx| {
             def_blocks
                 .entry(def)
@@ -31,7 +29,7 @@ pub fn construct_ssa_form(prog: &mut Program) {
         }
 
         place_phi_nodes(func, &dom_front, &def_blocks);
-        // rename_variables(func, &mut prog.interner, &dom_tree, &def_blocks);
+        rename_variables(func, &mut prog.interner, &dom_tree, &def_blocks);
     }
 }
 
@@ -41,8 +39,6 @@ fn place_phi_nodes(
     def_blocks: &BTreeMap<SymbolId, BitVector>,
 ) {
     let num_blocks = func.basic_blocks.len();
-    let interner = dom_front.interner;
-
     let mut iter_count = 0;
     let mut worklist = BitVector::new(num_blocks);
     let mut work = vec![0; num_blocks];
@@ -61,12 +57,11 @@ fn place_phi_nodes(
 
             for v in &dom_front.frontier[u] {
                 if has_already[v] < iter_count {
-                    let vals: Vec<PhiValue> = func
-                        .cfg
-                        .predecessors(*interner.resolve(v))
+                    let vals: Vec<PhiValue> = func.cfg.predecessors[v]
+                        .iter()
                         .map(|pred| PhiValue {
                             val: Value::Variable(dst),
-                            label: pred,
+                            label: func.basic_blocks[pred.0].label,
                         })
                         .collect();
 
@@ -94,25 +89,37 @@ fn rename_variables(
     dom_tree: &DominatorTree,
     def_blocks: &BTreeMap<SymbolId, BitVector>,
 ) {
-    let var_id_interner = def_blocks
-        .keys()
+    let var_id_interner = func
+        .params
+        .iter()
+        .map(|param| &param.var)
+        .chain(def_blocks.keys())
         .fold(Interner::new(), |mut interner, &def| {
             interner.intern(def);
             interner
         });
 
     let num_vars = var_id_interner.len();
-    let mut counters = vec![0; num_vars];
-    let mut stacks = vec![vec![]; num_vars];
+    let mut counter = vec![0; num_vars];
+    let mut stack = vec![vec![]; num_vars];
+
+    for param in &mut func.params {
+        let var = &mut param.var;
+        let idx = var_id_interner[var];
+        let i = counter[idx];
+        *var = SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(idx), i)));
+        stack[idx].push(i);
+        counter[idx] += 1;
+    }
 
     search(
         func,
         string_interner,
         dom_tree,
         &var_id_interner,
-        &mut counters,
-        &mut stacks,
-        0,
+        &mut counter,
+        &mut stack,
+        BlockId(0),
     );
 }
 
@@ -121,9 +128,49 @@ fn search(
     string_interner: &mut Interner<String>,
     dom_tree: &DominatorTree,
     var_id_interner: &Interner<SymbolId>,
-    counters: &mut Vec<u32>,
-    stacks: &mut Vec<Vec<u32>>,
+    counter: &mut Vec<u32>,
+    stack: &mut Vec<Vec<u32>>,
     node: BlockId,
 ) {
-    todo!()
+    let mut old_lhs = Vec::new();
+    let mut new_var = |idx, suffix| {
+        SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(idx), suffix)))
+    };
+
+    for inst in func.basic_blocks[node.0].instructions.iter_mut() {
+        for use_ in inst.uses().collect::<Vec<SymbolId>>() {
+            let idx = var_id_interner[&use_];
+            let i = *stack[idx].last().expect("stack should not be empty");
+            inst.replace_use(use_, new_var(idx, i));
+        }
+
+        if let Some(def) = inst.defs() {
+            let idx = var_id_interner[&def];
+            let i = counter[idx];
+            inst.replace_def(new_var(idx, i));
+            stack[idx].push(i);
+            counter[idx] += 1;
+            old_lhs.push(idx);
+        }
+    }
+
+    for succ in &func.cfg.successors[node.0] {
+        // TODO: this
+    }
+
+    for child in dom_tree.children(node) {
+        search(
+            func,
+            string_interner,
+            dom_tree,
+            var_id_interner,
+            counter,
+            stack,
+            child,
+        );
+    }
+
+    for &idx in &old_lhs {
+        stack[idx].pop();
+    }
 }

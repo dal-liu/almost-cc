@@ -126,7 +126,8 @@ impl CodeGenerator {
             }
 
             if let Some(term) = ctx.terminator {
-                self.emit_instruction(term, interner, prefix, suffix)?;
+                let inst = &func.basic_blocks[ctx.block_id.0].instructions[term];
+                self.emit_instruction(inst, interner, prefix, suffix)?;
             }
         }
 

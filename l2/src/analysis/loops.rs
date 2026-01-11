@@ -17,15 +17,13 @@ impl LoopForest {
     pub fn new(func: &Function, dominators: &DominatorTree) -> Self {
         let num_blocks = func.basic_blocks.len();
 
-        let back_edges = func.basic_blocks.iter().flat_map(|block| {
-            let latch = block.id;
-            func.cfg.successors[latch.0]
-                .iter()
-                .filter_map(move |&header| {
-                    dominators
-                        .dominates(header, latch)
-                        .then_some((latch, header))
-                })
+        let back_edges = (0..num_blocks).flat_map(|i| {
+            let latch = BlockId(i);
+            func.cfg.successors[i].iter().filter_map(move |&header| {
+                dominators
+                    .dominates(header, latch)
+                    .then_some((latch, header))
+            })
         });
 
         let natural_loops = back_edges.map(|(latch, header)| {

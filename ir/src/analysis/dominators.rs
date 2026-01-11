@@ -1,11 +1,8 @@
 use ir::*;
-use utils::{BitVector, Interner, Worklist};
-
-type BlockId = usize;
+use utils::{BitVector, Worklist};
 
 #[derive(Debug)]
 pub struct DominatorTree {
-    interner: Interner<SymbolId>,
     idom: Vec<Option<BlockId>>,
     children: Vec<BitVector>,
     preorder: Vec<u32>,
@@ -20,34 +17,26 @@ impl DominatorTree {
             sdom[i].set_from(0..num_blocks);
         }
 
-        let interner = func
-            .basic_blocks
-            .iter()
-            .fold(Interner::new(), |mut interner, block| {
-                interner.intern(block.label);
-                interner
-            });
-
-        let entry_label = func.basic_blocks[0].label;
+        let entry_id = BlockId(0);
         let mut worklist = Worklist::new();
-        worklist.push(entry_label);
+        worklist.push(entry_id);
 
-        while let Some(label) = worklist.pop() {
+        while let Some(id) = worklist.pop() {
+            let i = id.0;
             let mut temp = BitVector::new(num_blocks);
 
-            if label != entry_label {
+            if i != entry_id.0 {
                 temp.set_from(0..num_blocks);
-                for pred in func.cfg.predecessors(label) {
-                    temp.intersection(&sdom[interner[&pred]]);
+                for pred in &func.cfg.predecessors[i] {
+                    temp.intersection(&sdom[pred.0]);
                 }
             }
 
-            let i = interner[&label];
             temp.set(i);
 
             if temp != sdom[i] {
                 sdom[i] = temp;
-                worklist.extend(func.cfg.successors(label));
+                worklist.extend(func.cfg.successors[i].iter().copied());
             }
         }
 
@@ -57,13 +46,13 @@ impl DominatorTree {
 
         let idom: Vec<Option<BlockId>> = sdom
             .iter()
-            .map(|dom| dom.iter().max_by_key(|&n| sdom[n].count()))
+            .map(|dom| dom.iter().max_by_key(|&n| sdom[n].count()).map(BlockId))
             .collect();
 
         let mut children = vec![BitVector::new(num_blocks); num_blocks];
-        for (node, &parent) in idom.iter().enumerate() {
+        for (node, parent) in idom.iter().enumerate() {
             if let Some(parent) = parent {
-                children[parent].set(node);
+                children[parent.0].set(node);
             }
         }
 
@@ -73,24 +62,25 @@ impl DominatorTree {
 
         fn dfs(
             node: BlockId,
-            tree: &[BitVector],
+            children: &[BitVector],
             counter: &mut u32,
             preorder: &mut [u32],
             postorder: &mut [u32],
         ) {
-            preorder[node] = *counter;
+            let i = node.0;
+            preorder[i] = *counter;
             *counter += 1;
 
-            for child in &tree[node] {
-                dfs(child, tree, counter, preorder, postorder);
+            for child in &children[i] {
+                dfs(BlockId(child), children, counter, preorder, postorder);
             }
 
-            postorder[node] = *counter;
+            postorder[i] = *counter;
             *counter += 1;
         }
 
         dfs(
-            interner[&entry_label],
+            entry_id,
             &children,
             &mut counter,
             &mut preorder,
@@ -98,7 +88,6 @@ impl DominatorTree {
         );
 
         Self {
-            interner,
             idom,
             children,
             preorder,
@@ -107,32 +96,28 @@ impl DominatorTree {
     }
 
     pub fn dominates(&self, u: BlockId, v: BlockId) -> bool {
-        self.preorder[u] <= self.preorder[v] && self.postorder[u] >= self.postorder[v]
+        self.preorder[u.0] <= self.preorder[v.0] && self.postorder[u.0] >= self.postorder[v.0]
     }
 
     pub fn children(&self, node: BlockId) -> impl Iterator<Item = BlockId> {
-        self.children[node].iter()
+        self.children[node.0].iter().map(BlockId)
     }
 }
 
 #[derive(Debug)]
-pub struct DominanceFrontier<'a> {
-    pub interner: &'a Interner<SymbolId>,
+pub struct DominanceFrontier {
     pub frontier: Vec<BitVector>,
 }
 
-impl<'a> DominanceFrontier<'a> {
+impl<'a> DominanceFrontier {
     pub fn new(func: &Function, dom_tree: &'a DominatorTree) -> Self {
-        let interner = &dom_tree.interner;
         let num_blocks = func.basic_blocks.len();
 
         let mut local_frontier = vec![BitVector::new(num_blocks); num_blocks];
-        for (i, block) in func.basic_blocks.iter().enumerate() {
-            let u = interner[&block.label];
-            for succ in func.cfg.successors(block.label) {
-                let v = interner[&succ];
-                if u == v || !dom_tree.dominates(u, v) {
-                    local_frontier[i].set(v);
+        for i in 0..num_blocks {
+            for &succ in &func.cfg.successors[i] {
+                if i == succ.0 || !dom_tree.dominates(BlockId(i), succ) {
+                    local_frontier[i].set(succ.0);
                 }
             }
         }
@@ -141,29 +126,30 @@ impl<'a> DominanceFrontier<'a> {
 
         fn dfs(
             dom_tree: &DominatorTree,
-            id: BlockId,
+            node: BlockId,
             local_frontier: &[BitVector],
             frontier: &mut [BitVector],
         ) {
-            frontier[id] = local_frontier[id].clone();
+            let i = node.0;
+            frontier[i] = local_frontier[i].clone();
 
-            for child in &dom_tree.children[id] {
-                dfs(dom_tree, child, local_frontier, frontier);
+            for child in &dom_tree.children[i] {
+                dfs(dom_tree, BlockId(child), local_frontier, frontier);
 
-                if dom_tree.idom[child] != Some(id) {
-                    if id < child {
+                if dom_tree.idom[child] != Some(node) {
+                    if i < child {
                         let (left, right) = frontier.split_at_mut(child);
-                        left[id].set_from(right[0].iter());
+                        left[i].set_from(right[0].iter());
                     } else {
-                        let (left, right) = frontier.split_at_mut(id);
+                        let (left, right) = frontier.split_at_mut(i);
                         right[0].set_from(left[child].iter());
                     }
                 }
             }
         }
 
-        dfs(dom_tree, 0, &local_frontier, &mut frontier);
+        dfs(dom_tree, BlockId(0), &local_frontier, &mut frontier);
 
-        Self { interner, frontier }
+        Self { frontier }
     }
 }

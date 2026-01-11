@@ -276,7 +276,6 @@ impl DisplayResolved for Instruction {
 
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
-    pub id: BlockId,
     pub instructions: Vec<Instruction>,
 }
 
@@ -303,7 +302,6 @@ pub struct Function {
 impl Function {
     pub fn new(name: SymbolId, params: Vec<SymbolId>, instructions: Vec<Instruction>) -> Self {
         let mut basic_blocks = vec![BasicBlock {
-            id: BlockId(0),
             instructions: Vec::new(),
         }];
 
@@ -317,7 +315,6 @@ impl Function {
                 | Instruction::BranchCondition { .. } => {
                     block.instructions.push(inst);
                     basic_blocks.push(BasicBlock {
-                        id: BlockId(basic_blocks.len()),
                         instructions: Vec::new(),
                     });
                 }
@@ -327,7 +324,6 @@ impl Function {
                         block.instructions.push(inst);
                     } else {
                         basic_blocks.push(BasicBlock {
-                            id: BlockId(basic_blocks.len()),
                             instructions: vec![inst],
                         });
                     }
@@ -386,46 +382,45 @@ impl ControlFlowGraph {
     pub fn new(basic_blocks: &[BasicBlock]) -> Self {
         let id_map: HashMap<SymbolId, BlockId> = basic_blocks
             .iter()
-            .filter_map(|block| {
+            .enumerate()
+            .filter_map(|(i, block)| {
                 block.instructions.first().and_then(|inst| match inst {
-                    Instruction::Label(label) => Some((*label, block.id)),
+                    Instruction::Label(label) => Some((*label, BlockId(i))),
                     _ => None,
                 })
             })
             .collect();
 
         let num_blocks = basic_blocks.len();
-        let mut cfg = Self {
-            predecessors: vec![vec![]; num_blocks],
-            successors: vec![vec![]; num_blocks],
-        };
         let last_index = num_blocks.saturating_sub(1);
+        let mut predecessors = vec![vec![]; num_blocks];
+        let mut successors = vec![vec![]; num_blocks];
 
         for (i, block) in basic_blocks.iter().enumerate() {
             match block.instructions.last() {
                 Some(Instruction::BranchCondition { label, .. }) => {
                     let succ = id_map[label];
-                    cfg.successors[i].push(succ);
-                    cfg.predecessors[succ.0].push(block.id);
+                    successors[i].push(succ);
+                    predecessors[succ.0].push(BlockId(i));
 
                     if i < last_index && i + 1 != succ.0 {
-                        cfg.successors[i].push(BlockId(i + 1));
-                        cfg.predecessors[i + 1].push(block.id);
+                        successors[i].push(BlockId(i + 1));
+                        predecessors[i + 1].push(BlockId(i));
                     }
                 }
 
                 Some(Instruction::Branch(label)) => {
                     let succ = id_map[label];
-                    cfg.successors[i].push(succ);
-                    cfg.predecessors[succ.0].push(block.id);
+                    successors[i].push(succ);
+                    predecessors[succ.0].push(BlockId(i));
                 }
 
                 Some(Instruction::Return) | Some(Instruction::ReturnValue(_)) => (),
 
                 Some(_) => {
                     if i < last_index {
-                        cfg.successors[i].push(BlockId(i + 1));
-                        cfg.predecessors[i + 1].push(block.id);
+                        successors[i].push(BlockId(i + 1));
+                        predecessors[i + 1].push(BlockId(i));
                     }
                 }
 
@@ -433,7 +428,10 @@ impl ControlFlowGraph {
             };
         }
 
-        cfg
+        Self {
+            predecessors,
+            successors,
+        }
     }
 }
 

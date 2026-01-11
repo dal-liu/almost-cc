@@ -260,7 +260,7 @@ impl fmt::Display for Function {
         writeln!(f, "(@{}\n{} {}", self.name, self.args, self.locals)?;
 
         for inst in &self.instructions {
-            writeln!(f, "{}", inst)?;
+            writeln!(f, "\t{}", inst)?;
         }
 
         writeln!(f, ")")

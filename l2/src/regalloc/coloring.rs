@@ -79,7 +79,7 @@ impl<'a, 'b> ColoringAllocator<'a, 'b> {
         let mut move_list = vec![BitVector::new(num_moves); num_nodes];
 
         for (i, block) in func.basic_blocks.iter().enumerate() {
-            loop_depths[i] = 10u32.pow(loops.loop_depth(block.id));
+            loop_depths[i] = 10u32.pow(loops.loop_depth(BlockId(i)));
 
             for (j, inst) in block.instructions.iter().enumerate() {
                 for var in inst.defs().chain(inst.uses()) {

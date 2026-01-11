@@ -113,7 +113,6 @@ pub fn compute_reaching_def(func: &Function) -> ReachingDefResult {
 
     if !func.params.is_empty() {
         let dummy_block = BasicBlock {
-            id: BlockId(func.basic_blocks.len()),
             instructions: func
                 .params
                 .iter()
@@ -123,8 +122,7 @@ pub fn compute_reaching_def(func: &Function) -> ReachingDefResult {
                 })
                 .collect(),
         };
-
-        func_clone.cfg.predecessors[0].push(dummy_block.id);
+        func_clone.cfg.predecessors[0].push(BlockId(func.basic_blocks.len()));
         func_clone.cfg.predecessors.push(vec![]);
         func_clone.cfg.successors.push(vec![BlockId(0)]);
         func_clone.basic_blocks.push(dummy_block);

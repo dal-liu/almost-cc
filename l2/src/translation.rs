@@ -3,14 +3,13 @@ use l2::*;
 use utils::Interner;
 
 pub fn translate_program(prog: &Program) -> l1::Program {
-    let l1_functions: Vec<l1::Function> = prog
-        .functions
-        .iter()
-        .map(|func| translate_function(func, &prog.interner))
-        .collect();
     l1::Program {
         entry_point: prog.entry_point.clone(),
-        functions: l1_functions,
+        functions: prog
+            .functions
+            .iter()
+            .map(|func| translate_function(func, &prog.interner))
+            .collect(),
     }
 }
 

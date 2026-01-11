@@ -171,7 +171,7 @@ impl Instruction {
         use Instruction::*;
 
         match self {
-            Define { .. } | Insert { .. } | Call { .. } => None,
+            Define { var, .. } => Some(*var),
 
             Assign { dst, .. }
             | Binary { dst, .. }
@@ -182,6 +182,8 @@ impl Instruction {
             | NewArray { dst, .. }
             | NewTuple { dst, .. }
             | PhiNode { dst, .. } => Some(*dst),
+
+            Insert { .. } | Call { .. } => None,
         }
     }
 
@@ -194,7 +196,7 @@ impl Instruction {
         };
 
         match self {
-            Define { var, .. } => Box::new(iter::once(*var)),
+            Define { .. } => Box::new(iter::empty()),
 
             Assign { src, .. } => Box::new(var(src).into_iter()),
 
@@ -222,6 +224,100 @@ impl Instruction {
             NewTuple { len, .. } => Box::new(var(len).into_iter()),
 
             PhiNode { vals, .. } => Box::new(vals.iter().filter_map(move |val| var(&val.val))),
+        }
+    }
+
+    pub fn replace_def(&mut self, new: SymbolId) {
+        use Instruction::*;
+
+        match self {
+            Define { var, .. } => *var = new,
+
+            Assign { dst, .. }
+            | Binary { dst, .. }
+            | Extract { dst, .. }
+            | ArrayLength { dst, .. }
+            | TupleLength { dst, .. }
+            | CallResult { dst, .. }
+            | NewArray { dst, .. }
+            | NewTuple { dst, .. }
+            | PhiNode { dst, .. } => {
+                *dst = new;
+            }
+
+            Insert { .. } | Call { .. } => (),
+        }
+    }
+
+    pub fn replace_use(&mut self, old: SymbolId, new: SymbolId) {
+        use Instruction::*;
+
+        let replace_value = |val: &mut Value| {
+            if matches!(val, Value::Variable(var) if *var == old) {
+                *val = Value::Variable(new);
+            }
+        };
+
+        let replace_variable = |var: &mut SymbolId| {
+            if *var == old {
+                *var = new;
+            }
+        };
+
+        match self {
+            Define { .. } => (),
+
+            Assign { src, .. } => replace_value(src),
+
+            Binary { lhs, rhs, .. } => {
+                replace_value(lhs);
+                replace_value(rhs);
+            }
+
+            Extract { src, idxs, .. } => {
+                replace_variable(src);
+                for idx in idxs {
+                    replace_value(idx);
+                }
+            }
+
+            Insert { dst, idxs, src } => {
+                replace_variable(dst);
+                for idx in idxs {
+                    replace_value(idx);
+                }
+                replace_value(src);
+            }
+
+            ArrayLength { src, dim, .. } => {
+                replace_variable(src);
+                replace_value(dim);
+            }
+
+            TupleLength { src, .. } => replace_variable(src),
+
+            Call { callee, args } | CallResult { callee, args, .. } => {
+                if let Callee::Value(val) = callee {
+                    replace_value(val);
+                }
+                for arg in args {
+                    replace_value(arg);
+                }
+            }
+
+            NewArray { dims, .. } => {
+                for dim in dims {
+                    replace_value(dim);
+                }
+            }
+
+            NewTuple { len, .. } => replace_value(len),
+
+            PhiNode { vals, .. } => {
+                for val in vals {
+                    replace_value(&mut val.val);
+                }
+            }
         }
     }
 }
@@ -396,6 +492,9 @@ impl DisplayResolved for BasicBlock {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BlockId(pub usize);
+
 #[derive(Debug)]
 pub struct Function {
     pub ty: Type,
@@ -441,38 +540,39 @@ impl DisplayResolved for Parameter {
 
 #[derive(Debug)]
 pub struct ControlFlowGraph {
-    pub predecessors: HashMap<SymbolId, Vec<SymbolId>>,
-    pub successors: HashMap<SymbolId, Vec<SymbolId>>,
+    pub predecessors: Vec<Vec<BlockId>>,
+    pub successors: Vec<Vec<BlockId>>,
 }
 
 impl ControlFlowGraph {
     pub fn new(basic_blocks: &[BasicBlock]) -> Self {
-        let mut predecessors: HashMap<SymbolId, Vec<SymbolId>> = HashMap::new();
-        let mut successors: HashMap<SymbolId, Vec<SymbolId>> = HashMap::new();
+        let id_map: HashMap<SymbolId, BlockId> = basic_blocks
+            .iter()
+            .enumerate()
+            .map(|(i, block)| (block.label, BlockId(i)))
+            .collect();
 
-        for block in basic_blocks {
+        let num_blocks = basic_blocks.len();
+        let mut predecessors = vec![vec![]; num_blocks];
+        let mut successors = vec![vec![]; num_blocks];
+
+        for (i, block) in basic_blocks.iter().enumerate() {
             match &block.terminator {
                 Terminator::Branch(label) => {
-                    successors.entry(block.label).or_default().push(*label);
-                    predecessors.entry(*label).or_default().push(block.label);
+                    let succ = id_map[label];
+                    successors[i].push(succ);
+                    predecessors[succ.0].push(BlockId(i));
                 }
                 Terminator::BranchCondition {
                     true_label,
                     false_label,
                     ..
                 } => {
-                    successors
-                        .entry(block.label)
-                        .or_default()
-                        .extend([*true_label, *false_label]);
-                    predecessors
-                        .entry(*true_label)
-                        .or_default()
-                        .push(block.label);
-                    predecessors
-                        .entry(*false_label)
-                        .or_default()
-                        .push(block.label);
+                    let true_succ = id_map[true_label];
+                    let false_succ = id_map[false_label];
+                    successors[i].extend([true_succ, false_succ]);
+                    predecessors[true_succ.0].push(BlockId(i));
+                    predecessors[false_succ.0].push(BlockId(i));
                 }
                 _ => (),
             };
@@ -482,14 +582,6 @@ impl ControlFlowGraph {
             predecessors,
             successors,
         }
-    }
-
-    pub fn predecessors(&self, label: SymbolId) -> impl Iterator<Item = SymbolId> {
-        self.predecessors.get(&label).into_iter().flatten().copied()
-    }
-
-    pub fn successors(&self, label: SymbolId) -> impl Iterator<Item = SymbolId> {
-        self.successors.get(&label).into_iter().flatten().copied()
     }
 }
 
