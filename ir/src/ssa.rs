@@ -3,44 +3,44 @@ use utils::{BitVector, Interner};
 
 use crate::analysis::{DominanceFrontier, DominatorTree};
 
-pub fn construct_ssa_form(prog: &mut Program) {
-    for func in &mut prog.functions {
-        let dom_tree = DominatorTree::new(func);
-        let dom_front = DominanceFrontier::new(func, &dom_tree);
+pub fn construct_ssa_form(
+    func: &mut Function,
+    string_interner: &mut Interner<String>,
+    dom_tree: &DominatorTree,
+    dom_front: &DominanceFrontier,
+) {
+    let var_id_interner = func
+        .params
+        .iter()
+        .map(|param| param.var)
+        .chain(
+            func.basic_blocks
+                .iter()
+                .flat_map(|block| block.instructions.iter().filter_map(|inst| inst.defs())),
+        )
+        .fold(Interner::new(), |mut interner, def| {
+            interner.intern(def);
+            interner
+        });
 
-        let interner = func
-            .params
-            .iter()
-            .map(|param| param.var)
-            .chain(
-                func.basic_blocks
-                    .iter()
-                    .flat_map(|block| block.instructions.iter().filter_map(|inst| inst.defs())),
-            )
-            .fold(Interner::new(), |mut interner, def| {
-                interner.intern(def);
-                interner
-            });
-
-        let mut def_blocks = vec![BitVector::new(func.basic_blocks.len()); interner.len()];
-        for param in &func.params {
-            def_blocks[interner[&param.var]].set(0);
-        }
-        for (i, block) in func.basic_blocks.iter().enumerate() {
-            for def in block.instructions.iter().filter_map(|inst| inst.defs()) {
-                def_blocks[interner[&def]].set(i);
-            }
-        }
-
-        place_phi_nodes(func, &dom_front, &interner, &def_blocks);
-        rename_variables(func, &mut prog.interner, &dom_tree, &interner);
+    let mut def_blocks = vec![BitVector::new(func.basic_blocks.len()); var_id_interner.len()];
+    for param in &func.params {
+        def_blocks[var_id_interner[&param.var]].set(0);
     }
+    for (i, block) in func.basic_blocks.iter().enumerate() {
+        for def in block.instructions.iter().filter_map(|inst| inst.defs()) {
+            def_blocks[var_id_interner[&def]].set(i);
+        }
+    }
+
+    place_phi_nodes(func, &dom_front, &var_id_interner, &def_blocks);
+    rename_variables(func, string_interner, &dom_tree, &var_id_interner);
 }
 
 fn place_phi_nodes(
     func: &mut Function,
     dom_front: &DominanceFrontier,
-    interner: &Interner<SymbolId>,
+    var_id_interner: &Interner<SymbolId>,
     def_blocks: &[BitVector],
 ) {
     let num_blocks = func.basic_blocks.len();
@@ -50,7 +50,7 @@ fn place_phi_nodes(
     let mut has_already = vec![0; num_blocks];
 
     for (i, blocks) in def_blocks.iter().enumerate() {
-        let dst = *interner.resolve(i);
+        let dst = *var_id_interner.resolve(i);
         iter_count += 1;
 
         for node in blocks {

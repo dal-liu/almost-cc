@@ -3,7 +3,9 @@ mod parser;
 mod ssa;
 
 use clap::Parser;
+use utils::DisplayResolved;
 
+use crate::analysis::{DominanceFrontier, DominatorTree};
 use crate::parser::parse_file;
 use crate::ssa::construct_ssa_form;
 
@@ -25,7 +27,11 @@ fn main() {
             print!("{}", &prog);
         }
 
-        construct_ssa_form(&mut prog);
-        println!("{}", &prog);
+        for func in &mut prog.functions {
+            let dom_tree = DominatorTree::new(func);
+            let dom_front = DominanceFrontier::new(func, &dom_tree);
+            construct_ssa_form(func, &mut prog.interner, &dom_tree, &dom_front);
+            print!("{}", func.resolved(&prog.interner));
+        }
     }
 }
