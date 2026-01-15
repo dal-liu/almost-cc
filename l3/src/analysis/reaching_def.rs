@@ -44,7 +44,6 @@ impl ReachingDefAnalysis {
             .basic_blocks
             .iter()
             .flat_map(|block| &block.instructions)
-            .filter(|inst| inst.defs().is_some())
             .fold(
                 (Interner::new(), HashMap::new()),
                 |(mut interner, mut def_table), inst| {

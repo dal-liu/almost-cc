@@ -5,7 +5,7 @@ use std::iter;
 
 use utils::{DisplayResolved, Interner};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
     Int64,
     Array(usize),
@@ -26,7 +26,7 @@ impl fmt::Display for Type {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Callee {
     Value(Value),
     Print,
@@ -47,7 +47,7 @@ impl DisplayResolved for Callee {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Variable(SymbolId),
     Function(SymbolId),
@@ -73,7 +73,7 @@ impl DisplayResolved for SymbolId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -108,7 +108,7 @@ impl fmt::Display for BinaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Instruction {
     Define {
         ty: Type,
@@ -425,7 +425,7 @@ impl DisplayResolved for Instruction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PhiValue {
     pub val: Value,
     pub label: SymbolId,
@@ -504,7 +504,7 @@ impl DisplayResolved for Terminator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BasicBlock {
     pub label: SymbolId,
     pub instructions: Vec<Instruction>,
@@ -524,7 +524,7 @@ impl DisplayResolved for BasicBlock {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BlockId(pub usize);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub ty: Type,
     pub name: SymbolId,
@@ -555,7 +555,7 @@ impl DisplayResolved for Function {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Parameter {
     pub ty: Type,
     pub var: SymbolId,
@@ -567,7 +567,7 @@ impl DisplayResolved for Parameter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ControlFlowGraph {
     pub predecessors: Vec<Vec<BlockId>>,
     pub successors: Vec<Vec<BlockId>>,

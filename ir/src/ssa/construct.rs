@@ -124,8 +124,8 @@ fn search(
     string_interner: &mut Interner<String>,
     dom_tree: &DominatorTree,
     var_id_interner: &Interner<SymbolId>,
-    counter: &mut Vec<u32>,
-    stack: &mut Vec<Vec<u32>>,
+    counter: &mut [u32],
+    stack: &mut [Vec<u32>],
     node: BlockId,
 ) {
     let block = &mut func.basic_blocks[node.0];

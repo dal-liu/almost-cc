@@ -273,8 +273,12 @@ impl SelectionForest {
                     }
                 }
                 _ => {
-                    if mid.uses().any(|use_| inst1.defs() == Some(use_))
-                        || inst1.uses().any(|use_| mid.defs() == Some(use_))
+                    if mid
+                        .uses()
+                        .any(|use_| inst1.defs().is_some_and(|def| def == use_))
+                        || inst1
+                            .uses()
+                            .any(|use_| mid.defs().is_some_and(|def| def == use_))
                     {
                         return false;
                     }
