@@ -41,13 +41,16 @@ impl<'a> UseDefChain<'a> {
         let mut operands: Vec<Vec<BitVector>> = func
             .basic_blocks
             .iter()
-            .map(|block| vec![BitVector::new(interner.len()); block.instructions.len()])
+            .map(|block| vec![BitVector::new(interner.len()); block.instructions.len() + 1])
             .collect();
         for (i, block) in func.basic_blocks.iter().enumerate() {
             for (j, inst) in block.instructions.iter().enumerate() {
                 for use_ in inst.uses() {
                     operands[i][j].set(def_table[&use_]);
                 }
+            }
+            if let Some(use_) = block.terminator.uses() {
+                operands[i][block.instructions.len()].set(def_table[&use_]);
             }
         }
 
