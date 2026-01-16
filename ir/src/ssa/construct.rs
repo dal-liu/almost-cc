@@ -105,7 +105,7 @@ fn rename_variables(
         counter[v] += 1;
     }
 
-    search(
+    dfs(
         func,
         string_interner,
         dom_tree,
@@ -116,7 +116,7 @@ fn rename_variables(
     );
 }
 
-fn search(
+fn dfs(
     func: &mut Function,
     string_interner: &mut Interner<String>,
     dom_tree: &DominatorTree,
@@ -125,13 +125,12 @@ fn search(
     stack: &mut [Vec<u32>],
     node: BlockId,
 ) {
-    let block = &mut func.basic_blocks[node.0];
     let mut old_lhs = Vec::new();
-
     let mut new_var = |old_var: SymbolId, i: u32| {
         SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(old_var.0), i)))
     };
 
+    let block = &mut func.basic_blocks[node.0];
     for inst in block.instructions.iter_mut() {
         if !matches!(inst, Instruction::PhiNode { .. }) {
             for use_ in inst.uses().collect::<Vec<SymbolId>>() {
@@ -161,25 +160,22 @@ fn search(
     let label = block.label;
     for succ in &func.cfg.successors[node.0] {
         for inst in func.basic_blocks[succ.0].instructions.iter_mut() {
-            match inst {
-                Instruction::PhiNode { vals, .. } => {
-                    let val = vals
-                        .iter_mut()
-                        .find(|val| val.label == label)
-                        .expect("phi node should have value from predecessor");
-                    if let Value::Variable(var) = &mut val.val {
-                        let v = var_id_interner[var];
-                        let i = *stack[v].last().expect("stack should not be empty");
-                        *var = new_var(*var, i);
-                    }
+            if let Instruction::PhiNode { vals, .. } = inst {
+                let val = vals
+                    .iter_mut()
+                    .find(|val| val.label == label)
+                    .expect("phi node should have value from predecessor");
+                if let Value::Variable(var) = &mut val.val {
+                    let v = var_id_interner[var];
+                    let i = *stack[v].last().expect("stack should not be empty");
+                    *var = new_var(*var, i);
                 }
-                _ => (),
             }
         }
     }
 
     for child in dom_tree.children(node) {
-        search(
+        dfs(
             func,
             string_interner,
             dom_tree,
