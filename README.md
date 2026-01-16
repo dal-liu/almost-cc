@@ -12,7 +12,7 @@ Bridge between the higher-level IRs and x86-64 assembly (AT&T syntax). The L1 co
 
 #### L2
 
-Introduces variables. The L2 compiler performs register allocation using the Iterated Register Coalescing algorithm by George and Appel, 1996.
+Introduces variables. The L2 compiler performs register allocation using the Iterated Register Coalescing algorithm (George and Appel, 1996).
 
 #### L3
 
@@ -20,7 +20,7 @@ Simpler, C-style syntax that eliminates registers and calling convention. The L3
 
 #### IR
 
-Explicit control flow to enable easy analysis and transformation. The IR compiler constructs SSA form using the algorithm by Cytron et al., 1991, and optimizes the code.
+Explicit control flow to enable easy analysis and transformation. The IR compiler constructs SSA (Cytron et al., 1991) and optimizes the code.
 
 ## Acknowledgements
 
