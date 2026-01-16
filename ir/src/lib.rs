@@ -397,7 +397,7 @@ impl DisplayResolved for Instruction {
                 "call {}({})",
                 callee.resolved(interner),
                 args.iter()
-                    .map(|arg| format!("{}", arg.resolved(interner)))
+                    .map(|arg| arg.resolved(interner).to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -407,7 +407,7 @@ impl DisplayResolved for Instruction {
                 dst.resolved(interner),
                 callee.resolved(interner),
                 args.iter()
-                    .map(|arg| format!("{}", arg.resolved(interner)))
+                    .map(|arg| arg.resolved(interner).to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -416,7 +416,7 @@ impl DisplayResolved for Instruction {
                 "%{} <- new Array({})",
                 dst.resolved(interner),
                 dims.iter()
-                    .map(|dim| format!("{}", dim.resolved(interner)))
+                    .map(|dim| dim.resolved(interner).to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -431,7 +431,7 @@ impl DisplayResolved for Instruction {
                 "%{} <- phi {}",
                 dst.resolved(interner),
                 vals.iter()
-                    .map(|phi_val| format!("{}", phi_val.resolved(interner)))
+                    .map(|phi_val| phi_val.resolved(interner).to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -556,7 +556,7 @@ impl DisplayResolved for Function {
             self.name.resolved(interner),
             self.params
                 .iter()
-                .map(|param| format!("{}", param.resolved(interner)))
+                .map(|param| param.resolved(interner).to_string())
                 .collect::<Vec<String>>()
                 .join(", ")
         )?;

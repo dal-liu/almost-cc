@@ -256,7 +256,7 @@ impl DisplayResolved for Instruction {
                 "call {}({})",
                 callee.resolved(interner),
                 args.iter()
-                    .map(|arg| format!("{}", arg.resolved(interner)))
+                    .map(|arg| arg.resolved(interner).to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -266,7 +266,7 @@ impl DisplayResolved for Instruction {
                 dst.resolved(interner),
                 callee.resolved(interner),
                 args.iter()
-                    .map(|arg| format!("{}", arg.resolved(interner)))
+                    .map(|arg| arg.resolved(interner).to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),

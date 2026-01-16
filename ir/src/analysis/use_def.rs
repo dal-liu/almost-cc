@@ -79,7 +79,7 @@ impl DisplayResolved for UseDefChain {
                     .iter()
                     .map(|idx| self.interner.resolve(idx).resolved(interner).to_string())
                     .collect();
-                format!("{}", line.join(", "))
+                line.join(", ").to_string()
             })
             .collect();
         writeln!(f, "{}", lines.join("\n"))
