@@ -4,12 +4,23 @@ This is a compiler that lowers a C-like language into x86 assembly, built (almos
 
 ## Language
 
-The IR is split into several layers which get progressively lowered:
+The IR is split into several layers which get progressively lowered by their respective compilers.
 
-1. **L1:** Bridge between the higher-level IRs and x86-64 assembly (AT&T syntax). The L1 compiler does a nearly a 1-1 mapping to ASM.
-2. **L2:** Introduces variables. The L2 compiler performs register allocation using the Iterated Register Coalescing algorithm by George and Appel, 1996.
-3. **L3:** Simpler, C-style syntax that eliminates registers and calling convention. The L3 compiler implements instruction selection using the dynamic programming tiling method on trees.
-4. **IR:** Explicit control flow to enable easy analysis and transformation. The IR compiler constructs SSA form using the algorithm by Cytron et al., 1991, and optimizes the code.
+#### L1
+
+Bridge between the higher-level IRs and x86-64 assembly (AT&T syntax). The L1 compiler does a nearly a 1-1 mapping to ASM.
+
+#### L2
+
+Introduces variables. The L2 compiler performs register allocation using the Iterated Register Coalescing algorithm by George and Appel, 1996.
+
+#### L3
+
+Simpler, C-style syntax that eliminates registers and calling convention. The L3 compiler implements instruction selection using the dynamic programming tiling method on trees.
+
+#### IR
+
+Explicit control flow to enable easy analysis and transformation. The IR compiler constructs SSA form using the algorithm by Cytron et al., 1991, and optimizes the code.
 
 ## Acknowledgements
 
