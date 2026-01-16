@@ -16,7 +16,7 @@ Introduces variables. The L2 compiler performs register allocation using the Ite
 
 #### L3
 
-Simpler, C-style syntax that eliminates registers and calling convention. The L3 compiler implements instruction selection using the dynamic programming tiling method on trees.
+Simpler, C-style syntax that eliminates registers and calling convention. The L3 compiler implements instruction selection with the tiling method on trees, using dynamic programming to cover each tree optimally.
 
 #### IR
 
