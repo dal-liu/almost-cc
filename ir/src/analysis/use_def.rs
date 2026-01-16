@@ -1,22 +1,32 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use ir::*;
-use utils::{BitVector, Interner};
+use utils::{BitVector, DisplayResolved, Interner};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Operand<'a> {
+pub enum Operand {
     Argument,
-    Local(&'a Instruction),
+    Local(Instruction),
+}
+
+impl DisplayResolved for Operand {
+    fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
+        match self {
+            Self::Argument => write!(f, "arg"),
+            Self::Local(inst) => write!(f, "{}", inst.resolved(interner)),
+        }
+    }
 }
 
 #[derive(Debug)]
-pub struct UseDefChain<'a> {
-    interner: Interner<Operand<'a>>,
-    operands: Vec<Vec<BitVector>>,
+pub struct UseDefChain {
+    pub interner: Interner<Operand>,
+    pub operands: Vec<Vec<BitVector>>,
 }
 
-impl<'a> UseDefChain<'a> {
-    pub fn new(func: &'a Function) -> Self {
+impl UseDefChain {
+    pub fn new(func: &Function) -> Self {
         let (interner, def_table) = func
             .params
             .iter()
@@ -27,7 +37,7 @@ impl<'a> UseDefChain<'a> {
                     .flat_map(|block| &block.instructions)
                     .filter_map(|inst| {
                         inst.defs()
-                            .and_then(|def| Some((def, Operand::Local(inst))))
+                            .and_then(|def| Some((def, Operand::Local(inst.clone()))))
                     }),
             )
             .fold(
@@ -49,11 +59,29 @@ impl<'a> UseDefChain<'a> {
                     operands[i][j].set(def_table[&use_]);
                 }
             }
-            if let Some(use_) = block.terminator.uses() {
+            for use_ in block.terminator.uses() {
                 operands[i][block.instructions.len()].set(def_table[&use_]);
             }
         }
 
         Self { interner, operands }
+    }
+}
+
+impl DisplayResolved for UseDefChain {
+    fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
+        let lines: Vec<String> = self
+            .operands
+            .iter()
+            .flatten()
+            .map(|bitvec| {
+                let line: Vec<String> = bitvec
+                    .iter()
+                    .map(|idx| self.interner.resolve(idx).resolved(interner).to_string())
+                    .collect();
+                format!("{}", line.join(", "))
+            })
+            .collect();
+        writeln!(f, "{}", lines.join("\n"))
     }
 }

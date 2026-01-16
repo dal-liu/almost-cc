@@ -4,7 +4,7 @@ use std::iter;
 use l3::*;
 use utils::{BitVector, DisplayResolved, Interner};
 
-use crate::analysis::ReachingDefResult;
+use crate::analysis::reaching_def::ReachingDefResult;
 
 #[derive(Debug)]
 pub struct DefUseChain<'a> {

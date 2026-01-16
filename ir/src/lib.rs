@@ -5,6 +5,18 @@ use std::iter;
 
 use utils::{DisplayResolved, Interner};
 
+pub trait Statement {
+    fn defs(&self) -> Option<SymbolId> {
+        None
+    }
+
+    fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_>;
+
+    fn replace_def(&mut self, _: SymbolId) {}
+
+    fn replace_use(&mut self, old: SymbolId, new: &Value);
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
     Int64,
@@ -166,8 +178,8 @@ pub enum Instruction {
     },
 }
 
-impl Instruction {
-    pub fn defs(&self) -> Option<SymbolId> {
+impl Statement for Instruction {
+    fn defs(&self) -> Option<SymbolId> {
         use Instruction::*;
 
         match self {
@@ -187,7 +199,7 @@ impl Instruction {
         }
     }
 
-    pub fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_> {
+    fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_> {
         use Instruction::*;
 
         let var = |val: &Value| match val {
@@ -227,7 +239,7 @@ impl Instruction {
         }
     }
 
-    pub fn replace_def(&mut self, new: SymbolId) {
+    fn replace_def(&mut self, new: SymbolId) {
         use Instruction::*;
 
         match self {
@@ -249,18 +261,20 @@ impl Instruction {
         }
     }
 
-    pub fn replace_use(&mut self, old: SymbolId, new: SymbolId) {
+    fn replace_use(&mut self, old: SymbolId, new: &Value) {
         use Instruction::*;
 
         let replace_val = |val: &mut Value| {
             if matches!(val, Value::Variable(var) if *var == old) {
-                *val = Value::Variable(new);
+                *val = new.clone();
             }
         };
 
         let replace_var = |var: &mut SymbolId| {
-            if *var == old {
-                *var = new;
+            if let Value::Variable(replace) = new
+                && *var == old
+            {
+                *var = *replace;
             }
         };
 
@@ -454,24 +468,24 @@ pub enum Terminator {
     ReturnValue(Value),
 }
 
-impl Terminator {
-    pub fn uses(&self) -> Option<SymbolId> {
+impl Statement for Terminator {
+    fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_> {
         let var = |val: &Value| match val {
             Value::Variable(var) => Some(*var),
             _ => None,
         };
 
         match self {
-            Self::Branch(_) | Self::Return => None,
-            Self::BranchCondition { cond, .. } => var(cond),
-            Self::ReturnValue(val) => var(val),
+            Self::Branch(_) | Self::Return => Box::new(iter::empty()),
+            Self::BranchCondition { cond, .. } => Box::new(var(cond).into_iter()),
+            Self::ReturnValue(val) => Box::new(var(val).into_iter()),
         }
     }
 
-    pub fn replace_use(&mut self, new: SymbolId) {
+    fn replace_use(&mut self, old: SymbolId, new: &Value) {
         let replace_val = |val: &mut Value| {
-            if let Value::Variable(var) = val {
-                *var = new;
+            if matches!(val, Value::Variable(var) if *var == old) {
+                *val = new.clone();
             }
         };
 

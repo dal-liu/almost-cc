@@ -1,14 +1,11 @@
 use ir::*;
 use utils::{BitVector, Interner};
 
-use crate::analysis::{DominanceFrontier, DominatorTree};
+use crate::analysis::dominators::{DominanceFrontier, DominatorTree};
 
-pub fn construct_ssa_form(
-    func: &mut Function,
-    string_interner: &mut Interner<String>,
-    dom_tree: &DominatorTree,
-    dom_front: &DominanceFrontier,
-) {
+pub fn construct_ssa_form(func: &mut Function, string_interner: &mut Interner<String>) {
+    let dom_tree = DominatorTree::new(func);
+    let dom_front = DominanceFrontier::new(func, &dom_tree);
     let var_id_interner = func
         .params
         .iter()
@@ -140,7 +137,7 @@ fn search(
             for use_ in inst.uses().collect::<Vec<SymbolId>>() {
                 let v = var_id_interner[&use_];
                 let i = *stack[v].last().expect("stack should not be empty");
-                inst.replace_use(use_, new_var(use_, i));
+                inst.replace_use(use_, &Value::Variable(new_var(use_, i)));
             }
         }
 
@@ -155,10 +152,10 @@ fn search(
     }
 
     let term = &mut block.terminator;
-    if let Some(use_) = term.uses() {
+    for use_ in term.uses().collect::<Vec<SymbolId>>() {
         let v = var_id_interner[&use_];
         let i = *stack[v].last().expect("stack should not be empty");
-        term.replace_use(new_var(use_, i));
+        term.replace_use(use_, &Value::Variable(new_var(use_, i)));
     }
 
     let label = block.label;

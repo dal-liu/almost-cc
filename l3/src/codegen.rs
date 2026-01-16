@@ -6,7 +6,9 @@ use l2;
 use l3::*;
 use utils::{DisplayResolved, Interner};
 
-use crate::analysis::{DefUseChain, compute_liveness, compute_reaching_def};
+use crate::analysis::def_use::DefUseChain;
+use crate::analysis::liveness::compute_liveness;
+use crate::analysis::reaching_def::compute_reaching_def;
 use crate::isel::contexts::create_contexts;
 use crate::isel::forest::{NodeId, NodeKind, SelectionForest, generate_forest};
 use crate::isel::tiling::{Cover, cover_forest, isel_tiles};

@@ -1,5 +1,3 @@
-mod dataflow;
-mod dominators;
-mod use_def;
-
-pub use dominators::{DominanceFrontier, DominatorTree};
+pub mod dataflow;
+pub mod dominators;
+pub mod use_def;

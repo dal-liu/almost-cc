@@ -4,7 +4,8 @@ use std::iter;
 use l2::*;
 use utils::{BitVector, Interner};
 
-use crate::analysis::{LivenessResult, LoopForest};
+use crate::analysis::liveness::LivenessResult;
+use crate::analysis::loops::LoopForest;
 use crate::regalloc::interference::InterferenceGraph;
 
 type ValueId = usize;

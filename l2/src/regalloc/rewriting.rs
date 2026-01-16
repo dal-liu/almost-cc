@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use l2::*;
 use utils::Interner;
 
-use crate::analysis::{DominatorTree, LoopForest, compute_liveness};
+use crate::analysis::dominators::DominatorTree;
+use crate::analysis::liveness::compute_liveness;
+use crate::analysis::loops::LoopForest;
 use crate::regalloc::coloring::{ColoringResult, color_graph};
 use crate::regalloc::interference::InterferenceGraph;
 use crate::regalloc::spilling::spill;

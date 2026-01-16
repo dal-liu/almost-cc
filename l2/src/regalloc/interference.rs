@@ -3,7 +3,7 @@ use std::fmt;
 use l2::*;
 use utils::{BitVector, DisplayResolved, Interner};
 
-use crate::analysis::LivenessResult;
+use crate::analysis::liveness::LivenessResult;
 
 type NodeId = usize;
 
