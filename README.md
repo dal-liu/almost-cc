@@ -1,6 +1,6 @@
 ## About
 
-This is a compiler that lowers a C-like language into x86 assembly, built (almost) entirely from scratch in Rust. I previously implemented this in C++ for the [Compiler Construction course](https://users.cs.northwestern.edu/~simonec/CC.html) at Northwestern University, but I thought it would be fun to revisit it in Rust this time.
+This is a compiler that lowers a C-like language into x86 assembly, built (almost) entirely from scratch in Rust. I previously implemented this in C++ for the [Compiler Construction course](https://users.cs.northwestern.edu/~simonec/CC.html) at Northwestern University, but I thought it would be fun to revisit it in Rust this time. (It is!)
 
 ## Language
 

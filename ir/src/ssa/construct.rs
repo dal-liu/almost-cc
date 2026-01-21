@@ -1,5 +1,5 @@
 use ir::*;
-use utils::{BitVector, Interner};
+use utils::{BitVector, Interner, Worklist};
 
 use crate::analysis::dominators::{DominanceFrontier, DominatorTree};
 
@@ -20,7 +20,17 @@ pub fn construct_ssa_form(func: &mut Function, string_interner: &mut Interner<St
             interner
         });
 
-    let mut def_blocks = vec![BitVector::new(func.basic_blocks.len()); var_id_interner.len()];
+    place_phi_nodes(func, &dom_front, &var_id_interner);
+    rename_variables(func, string_interner, &dom_tree, &var_id_interner);
+}
+
+fn place_phi_nodes(
+    func: &mut Function,
+    dom_front: &DominanceFrontier,
+    var_id_interner: &Interner<SymbolId>,
+) {
+    let num_blocks = func.basic_blocks.len();
+    let mut def_blocks = vec![BitVector::new(num_blocks); var_id_interner.len()];
     for param in &func.params {
         def_blocks[var_id_interner[&param.var]].set(0);
     }
@@ -30,19 +40,8 @@ pub fn construct_ssa_form(func: &mut Function, string_interner: &mut Interner<St
         }
     }
 
-    place_phi_nodes(func, &dom_front, &var_id_interner, &def_blocks);
-    rename_variables(func, string_interner, &dom_tree, &var_id_interner);
-}
-
-fn place_phi_nodes(
-    func: &mut Function,
-    dom_front: &DominanceFrontier,
-    var_id_interner: &Interner<SymbolId>,
-    def_blocks: &[BitVector],
-) {
-    let num_blocks = func.basic_blocks.len();
     let mut iter_count = 0;
-    let mut worklist = BitVector::new(num_blocks);
+    let mut worklist = Worklist::new();
     let mut work = vec![0; num_blocks];
     let mut has_already = vec![0; num_blocks];
 
@@ -52,12 +51,10 @@ fn place_phi_nodes(
 
         for node in blocks {
             work[node] = iter_count;
-            worklist.set(node);
+            worklist.push(node);
         }
 
-        while let Some(u) = worklist.iter().next() {
-            worklist.reset(u);
-
+        while let Some(u) = worklist.pop() {
             for v in &dom_front.frontier[u] {
                 if has_already[v] < iter_count {
                     let vals: Vec<PhiValue> = func.cfg.predecessors[v]
@@ -78,7 +75,7 @@ fn place_phi_nodes(
 
                     if work[v] < iter_count {
                         work[v] = iter_count;
-                        worklist.set(v);
+                        worklist.push(v);
                     }
                 }
             }

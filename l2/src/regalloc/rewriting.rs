@@ -29,7 +29,7 @@ pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) 
 
         for var in &coloring.spill_nodes {
             let spilled = spill(func, var, prefix, &mut suffix, interner);
-            prev_spilled.extend(spilled.into_iter());
+            prev_spilled.extend(spilled.map(Value::Variable));
         }
     }
 }

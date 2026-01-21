@@ -9,7 +9,7 @@ pub fn spill(
     prefix: &str,
     suffix: &mut i32,
     interner: &mut Interner<String>,
-) -> Vec<Value> {
+) -> impl Iterator<Item = SymbolId> {
     let mut modified = false;
     let mut spill_vars = Vec::new();
     let offset = func.locals * 8;
@@ -21,8 +21,7 @@ pub fn spill(
             let spill_def = inst.defs().any(|def| &def == var);
 
             let spill_var = if spill_use || spill_def {
-                let new_var =
-                    Value::Variable(SymbolId(interner.intern(format!("{}{}", prefix, suffix))));
+                let new_var = SymbolId(interner.intern(format!("{}{}", prefix, suffix)));
                 *suffix += 1;
                 modified = true;
                 spill_vars.push(new_var);
@@ -34,7 +33,7 @@ pub fn spill(
             if spill_use {
                 if let Some(new_var) = spill_var {
                     block.instructions.push(Instruction::Load {
-                        dst: new_var,
+                        dst: Value::Variable(new_var),
                         src: Value::Register(Register::RSP),
                         offset,
                     });
@@ -43,8 +42,8 @@ pub fn spill(
 
             if spill_use || spill_def {
                 let mut new_inst = inst;
-                if let Some(ref new_var) = spill_var {
-                    new_inst.replace_value(var, new_var);
+                if let Some(new_var) = spill_var {
+                    new_inst.replace_value(var, &Value::Variable(new_var));
                 }
                 block.instructions.push(new_inst);
             } else {
@@ -56,7 +55,7 @@ pub fn spill(
                     block.instructions.push(Instruction::Store {
                         dst: Value::Register(Register::RSP),
                         offset,
-                        src: new_var,
+                        src: Value::Variable(new_var),
                     });
                 }
             }
@@ -67,5 +66,5 @@ pub fn spill(
         func.locals += 1;
     }
 
-    spill_vars
+    spill_vars.into_iter()
 }

@@ -8,11 +8,7 @@ pub fn propagate_constants(func: &mut Function) -> bool {
 
     for (i, block) in func.basic_blocks.iter_mut().enumerate() {
         let num_insts = block.instructions.len();
-        for (j, mut inst) in
-            std::mem::replace(&mut block.instructions, Vec::with_capacity(num_insts))
-                .into_iter()
-                .enumerate()
-        {
+        for (j, inst) in block.instructions.iter_mut().enumerate() {
             for (use_, op) in inst
                 .uses()
                 .collect::<Vec<SymbolId>>()
@@ -29,8 +25,6 @@ pub fn propagate_constants(func: &mut Function) -> bool {
                     }
                 }
             }
-
-            block.instructions.push(inst);
         }
 
         let term = &mut block.terminator;
