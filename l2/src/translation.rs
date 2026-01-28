@@ -56,22 +56,24 @@ fn translate_instruction(
     locals: i64,
 ) -> l1::Instruction {
     use Instruction::*;
+    use l1::Instruction as L1;
+
     match inst {
-        Assign { dst, src } => l1::Instruction::Assign {
+        Assign { dst, src } => L1::Assign {
             dst: translate_register(dst),
             src: translate_value(src, interner),
         },
-        Load { dst, src, offset } => l1::Instruction::Load {
+        Load { dst, src, offset } => L1::Load {
             dst: translate_register(dst),
             src: translate_register(src),
             offset: *offset,
         },
-        Store { dst, offset, src } => l1::Instruction::Store {
+        Store { dst, offset, src } => L1::Store {
             dst: translate_register(dst),
             offset: *offset,
             src: translate_value(src, interner),
         },
-        StackArg { dst, offset } => l1::Instruction::Load {
+        StackArg { dst, offset } => L1::Load {
             dst: translate_register(dst),
             src: l1::Register::RSP,
             offset: locals * 8 + offset,
@@ -83,7 +85,7 @@ fn translate_instruction(
                 ArithmeticOp::MulAssign => l1::ArithmeticOp::MulAssign,
                 ArithmeticOp::BitAndAssign => l1::ArithmeticOp::BitAndAssign,
             };
-            l1::Instruction::Arithmetic {
+            L1::Arithmetic {
                 dst: translate_register(dst),
                 aop: l1_aop,
                 src: translate_value(src, interner),
@@ -94,7 +96,7 @@ fn translate_instruction(
                 ShiftOp::ShlAssign => l1::ShiftOp::ShlAssign,
                 ShiftOp::ShrAssign => l1::ShiftOp::ShrAssign,
             };
-            l1::Instruction::Shift {
+            L1::Shift {
                 dst: translate_register(dst),
                 sop: l1_sop,
                 src: translate_value(src, interner),
@@ -111,7 +113,7 @@ fn translate_instruction(
                 ArithmeticOp::SubAssign => l1::ArithmeticOp::SubAssign,
                 _ => unreachable!("store arithmetic invalid op"),
             };
-            l1::Instruction::StoreArithmetic {
+            L1::StoreArithmetic {
                 dst: translate_register(dst),
                 offset: *offset,
                 aop: l1_aop,
@@ -129,7 +131,7 @@ fn translate_instruction(
                 ArithmeticOp::SubAssign => l1::ArithmeticOp::SubAssign,
                 _ => unreachable!("store arithmetic invalid op"),
             };
-            l1::Instruction::LoadArithmetic {
+            L1::LoadArithmetic {
                 dst: translate_register(dst),
                 aop: l1_aop,
                 src: translate_register(src),
@@ -142,7 +144,7 @@ fn translate_instruction(
                 CompareOp::Le => l1::CompareOp::Le,
                 CompareOp::Eq => l1::CompareOp::Eq,
             };
-            l1::Instruction::Compare {
+            L1::Compare {
                 dst: translate_register(dst),
                 lhs: translate_value(lhs, interner),
                 cmp: l1_cmp,
@@ -160,33 +162,33 @@ fn translate_instruction(
                 CompareOp::Le => l1::CompareOp::Le,
                 CompareOp::Eq => l1::CompareOp::Eq,
             };
-            l1::Instruction::CJump {
+            L1::CJump {
                 lhs: translate_value(lhs, interner),
                 cmp: l1_cmp,
                 rhs: translate_value(rhs, interner),
                 label: interner.resolve(label.0).clone(),
             }
         }
-        Label(label) => l1::Instruction::Label(interner.resolve(label.0).clone()),
-        Goto(label) => l1::Instruction::Goto(interner.resolve(label.0).clone()),
-        Return => l1::Instruction::Return,
-        Call { callee, args } => l1::Instruction::Call {
+        Label(label) => L1::Label(interner.resolve(label.0).clone()),
+        Goto(label) => L1::Goto(interner.resolve(label.0).clone()),
+        Return => L1::Return,
+        Call { callee, args } => L1::Call {
             callee: translate_value(callee, interner),
             args: *args,
         },
-        Print => l1::Instruction::Print,
-        Input => l1::Instruction::Input,
-        Allocate => l1::Instruction::Allocate,
-        TupleError => l1::Instruction::TupleError,
-        TensorError(args) => l1::Instruction::TensorError(*args),
-        Increment(reg) => l1::Instruction::Increment(translate_register(reg)),
-        Decrement(reg) => l1::Instruction::Decrement(translate_register(reg)),
+        Print => L1::Print,
+        Input => L1::Input,
+        Allocate => L1::Allocate,
+        TupleError => L1::TupleError,
+        TensorError(args) => L1::TensorError(*args),
+        Increment(reg) => L1::Increment(translate_register(reg)),
+        Decrement(reg) => L1::Decrement(translate_register(reg)),
         LEA {
             dst,
             src,
             offset,
             scale,
-        } => l1::Instruction::LEA {
+        } => L1::LEA {
             dst: translate_register(dst),
             src: translate_register(src),
             offset: translate_register(offset),

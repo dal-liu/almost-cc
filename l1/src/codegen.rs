@@ -61,6 +61,7 @@ impl CodeGenerator {
 
     fn emit_instruction(&mut self, inst: &Instruction, args: i64, locals: i64) -> io::Result<()> {
         use Instruction::*;
+
         match inst {
             Assign { dst, src } => {
                 writeln!(self.stream, "\tmovq {}, %{}", self.format_value(src), dst)
@@ -281,6 +282,7 @@ impl CodeGenerator {
 
     fn format_register_8_bit(&self, reg: &Register) -> &'static str {
         use Register::*;
+
         match reg {
             RAX => "%al",
             RBX => "%bl",

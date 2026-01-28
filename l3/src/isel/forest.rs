@@ -32,6 +32,7 @@ pub enum OpKind {
 impl fmt::Display for OpKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use OpKind::*;
+
         let op = match self {
             Assign => "<-",
             Add => "+",

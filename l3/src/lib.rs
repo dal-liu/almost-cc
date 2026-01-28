@@ -206,6 +206,7 @@ impl Instruction {
 impl DisplayResolved for Instruction {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         use Instruction::*;
+
         match self {
             Assign { dst, src } => write!(
                 f,

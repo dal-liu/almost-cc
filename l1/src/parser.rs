@@ -40,31 +40,29 @@ fn comment<'src>() -> impl Parser<'src, &'src str, (), L1Extra<'src>> {
 }
 
 fn write_register<'src>() -> impl Parser<'src, &'src str, Register, L1Extra<'src>> {
-    use Register::*;
     choice((
         arg_register(),
-        just("rax").to(RAX),
-        just("rbx").to(RBX),
-        just("rbp").to(RBP),
-        just("r10").to(R10),
-        just("r11").to(R11),
-        just("r12").to(R12),
-        just("r13").to(R13),
-        just("r14").to(R14),
-        just("r15").to(R15),
+        just("rax").to(Register::RAX),
+        just("rbx").to(Register::RBX),
+        just("rbp").to(Register::RBP),
+        just("r10").to(Register::R10),
+        just("r11").to(Register::R11),
+        just("r12").to(Register::R12),
+        just("r13").to(Register::R13),
+        just("r14").to(Register::R14),
+        just("r15").to(Register::R15),
     ))
     .padded_by(separators())
 }
 
 fn arg_register<'src>() -> impl Parser<'src, &'src str, Register, L1Extra<'src>> {
-    use Register::*;
     choice((
-        just("rdi").to(RDI),
-        just("rsi").to(RSI),
-        just("rdx").to(RDX),
+        just("rdi").to(Register::RDI),
+        just("rsi").to(Register::RSI),
+        just("rdx").to(Register::RDX),
         rcx(),
-        just("r8").to(R8),
-        just("r9").to(R9),
+        just("r8").to(Register::R8),
+        just("r9").to(Register::R9),
     ))
     .padded_by(separators())
 }

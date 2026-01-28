@@ -2,53 +2,36 @@ use ir::*;
 
 use crate::analysis::use_def::{Operand, UseDefChain};
 
-type StmtId = usize;
-
 pub fn constant_propagation(func: &mut Function) -> bool {
     let use_def = UseDefChain::new(func);
     let mut modified = false;
 
-    for (i, block) in func.basic_blocks.iter_mut().enumerate() {
-        let block_id = BlockId(i);
-        for (j, inst) in block.instructions.iter_mut().enumerate() {
-            modified |= try_propagate(inst, &use_def, block_id, j);
+    for block in &mut func.basic_blocks {
+        for inst in &mut block.instructions {
+            modified |= try_propagate(inst, &use_def);
         }
-        modified |= try_propagate(
-            &mut block.terminator,
-            &use_def,
-            block_id,
-            block.instructions.len(),
-        );
+        modified |= try_propagate(&mut block.terminator, &use_def);
     }
 
     modified
 }
 
-fn try_propagate(
-    stmt: &mut impl Statement,
-    use_def: &UseDefChain,
-    block_id: BlockId,
-    stmt_id: StmtId,
-) -> bool {
+fn try_propagate(stmt: &mut impl Statement, use_def: &UseDefChain) -> bool {
+    let operands: Vec<&Operand> = use_def.operands(stmt).collect();
     let mut modified = false;
 
-    for (use_, op) in stmt
-        .uses()
-        .collect::<Vec<SymbolId>>()
-        .into_iter()
-        .zip(&use_def.operands[block_id.0][stmt_id])
-    {
-        if let Operand::Local(def_inst) = use_def.interner.resolve(op) {
+    for (use_, op) in stmt.uses_mut().into_iter().zip(operands) {
+        if let Operand::Local(def_inst) = op {
             match def_inst {
                 Instruction::Assign { src, .. } if matches!(src, Value::Number(_)) => {
-                    stmt.replace_use(use_, src);
+                    *use_ = src.clone();
                     modified = true;
                 }
                 Instruction::PhiNode { vals, .. } => {
                     let mut it = vals.iter().map(|val| &val.val);
-                    if let Some(Value::Number(num)) = it.next() {
-                        if it.all(|val| matches!(val, Value::Number(n) if n == num)) {
-                            stmt.replace_use(use_, &Value::Number(*num));
+                    if let Some(Value::Number(first)) = it.next() {
+                        if it.all(|val| matches!(val, Value::Number(num) if num == first)) {
+                            *use_ = Value::Number(*first);
                             modified = true;
                         }
                     };

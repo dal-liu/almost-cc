@@ -208,7 +208,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, IRExtra<'src
         )
         .map_with(|((dst, src), idxs), e| Instruction::Extract {
             dst: SymbolId(e.state().intern(dst.to_owned())),
-            src: SymbolId(e.state().intern(src.to_owned())),
+            src: Value::Variable(SymbolId(e.state().intern(src.to_owned()))),
             idxs,
         });
 
@@ -225,7 +225,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, IRExtra<'src
         .then_ignore(arrow)
         .then(value())
         .map_with(|((dst, idxs), src), e| Instruction::Insert {
-            dst: SymbolId(e.state().intern(dst.to_owned())),
+            dst: Value::Variable(SymbolId(e.state().intern(dst.to_owned()))),
             idxs,
             src,
         });
@@ -237,7 +237,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, IRExtra<'src
         .then(variable_or_number())
         .map_with(|((dst, src), dim), e| Instruction::ArrayLength {
             dst: SymbolId(e.state().intern(dst.to_owned())),
-            src: SymbolId(e.state().intern(src.to_owned())),
+            src: Value::Variable(SymbolId(e.state().intern(src.to_owned()))),
             dim,
         });
 
@@ -247,7 +247,7 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, IRExtra<'src
         .then(variable_name())
         .map_with(|(dst, src), e| Instruction::TupleLength {
             dst: SymbolId(e.state().intern(dst.to_owned())),
-            src: SymbolId(e.state().intern(src.to_owned())),
+            src: Value::Variable(SymbolId(e.state().intern(src.to_owned()))),
         });
 
     let call_inst = call_keyword

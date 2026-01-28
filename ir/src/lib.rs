@@ -6,15 +6,17 @@ use std::iter;
 use utils::{DisplayResolved, Interner};
 
 pub trait Statement {
-    fn defs(&self) -> Option<SymbolId> {
+    fn defs(&self) -> Option<&SymbolId> {
         None
     }
 
-    fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_>;
+    fn uses(&self) -> Box<dyn Iterator<Item = &Value> + '_>;
 
-    fn replace_def(&mut self, _: SymbolId) {}
+    fn defs_mut(&mut self) -> Option<&mut SymbolId> {
+        None
+    }
 
-    fn replace_use(&mut self, old: SymbolId, new: &Value);
+    fn uses_mut(&mut self) -> Box<dyn Iterator<Item = &mut Value> + '_>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -103,6 +105,7 @@ pub enum BinaryOp {
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use BinaryOp::*;
+
         let op = match self {
             Add => "+",
             Sub => "-",
@@ -138,22 +141,22 @@ pub enum Instruction {
     },
     Extract {
         dst: SymbolId,
-        src: SymbolId,
+        src: Value,
         idxs: Vec<Value>,
     },
     Insert {
-        dst: SymbolId,
+        dst: Value,
         idxs: Vec<Value>,
         src: Value,
     },
     ArrayLength {
         dst: SymbolId,
-        src: SymbolId,
+        src: Value,
         dim: Value,
     },
     TupleLength {
         dst: SymbolId,
-        src: SymbolId,
+        src: Value,
     },
     Call {
         callee: Callee,
@@ -179,11 +182,11 @@ pub enum Instruction {
 }
 
 impl Statement for Instruction {
-    fn defs(&self) -> Option<SymbolId> {
+    fn defs(&self) -> Option<&SymbolId> {
         use Instruction::*;
 
         match self {
-            Define { var, .. } => Some(*var),
+            Define { var, .. } => Some(var),
 
             Assign { dst, .. }
             | Binary { dst, .. }
@@ -193,57 +196,50 @@ impl Statement for Instruction {
             | CallResult { dst, .. }
             | NewArray { dst, .. }
             | NewTuple { dst, .. }
-            | PhiNode { dst, .. } => Some(*dst),
+            | PhiNode { dst, .. } => Some(dst),
 
             Insert { .. } | Call { .. } => None,
         }
     }
 
-    fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_> {
+    fn uses(&self) -> Box<dyn Iterator<Item = &Value> + '_> {
         use Instruction::*;
-
-        let var = |val: &Value| match val {
-            Value::Variable(id) => Some(*id),
-            _ => None,
-        };
 
         match self {
             Define { .. } => Box::new(iter::empty()),
 
-            Assign { src, .. } => Box::new(var(src).into_iter()),
+            Assign { src, .. } => Box::new(iter::once(src)),
 
-            Binary { lhs, rhs, .. } => Box::new([lhs, rhs].into_iter().filter_map(var)),
+            Binary { lhs, rhs, .. } => Box::new([lhs, rhs].into_iter()),
 
-            Extract { src, idxs, .. } => {
-                Box::new(iter::once(*src).chain(idxs.iter().filter_map(var)))
-            }
+            Extract { src, idxs, .. } => Box::new(iter::once(src).chain(idxs)),
 
-            Insert { idxs, src, .. } => Box::new(idxs.iter().filter_map(var).chain(var(src))),
+            Insert { idxs, src, .. } => Box::new(idxs.iter().chain(iter::once(src))),
 
-            ArrayLength { src, dim, .. } => Box::new(iter::once(*src).chain(var(dim))),
+            ArrayLength { src, dim, .. } => Box::new([src, dim].into_iter()),
 
-            TupleLength { src, .. } => Box::new(iter::once(*src)),
+            TupleLength { src, .. } => Box::new(iter::once(src)),
 
             Call { callee, args } | CallResult { callee, args, .. } => {
-                Box::new(args.iter().filter_map(var).chain(match callee {
-                    Callee::Value(val) => var(val),
+                Box::new(args.iter().chain(match callee {
+                    Callee::Value(val) => Some(val),
                     _ => None,
                 }))
             }
 
-            NewArray { dims, .. } => Box::new(dims.iter().filter_map(var)),
+            NewArray { dims, .. } => Box::new(dims.iter()),
 
-            NewTuple { len, .. } => Box::new(var(len).into_iter()),
+            NewTuple { len, .. } => Box::new(iter::once(len)),
 
-            PhiNode { vals, .. } => Box::new(vals.iter().filter_map(move |val| var(&val.val))),
+            PhiNode { vals, .. } => Box::new(vals.iter().map(|val| &val.val)),
         }
     }
 
-    fn replace_def(&mut self, new: SymbolId) {
+    fn defs_mut(&mut self) -> Option<&mut SymbolId> {
         use Instruction::*;
 
         match self {
-            Define { var, .. } => *var = new,
+            Define { var, .. } => Some(var),
 
             Assign { dst, .. }
             | Binary { dst, .. }
@@ -253,85 +249,42 @@ impl Statement for Instruction {
             | CallResult { dst, .. }
             | NewArray { dst, .. }
             | NewTuple { dst, .. }
-            | PhiNode { dst, .. } => {
-                *dst = new;
-            }
+            | PhiNode { dst, .. } => Some(dst),
 
-            Insert { .. } | Call { .. } => (),
+            Insert { .. } | Call { .. } => None,
         }
     }
 
-    fn replace_use(&mut self, old: SymbolId, new: &Value) {
+    fn uses_mut(&mut self) -> Box<dyn Iterator<Item = &mut Value> + '_> {
         use Instruction::*;
 
-        let replace_val = |val: &mut Value| {
-            if matches!(val, Value::Variable(var) if *var == old) {
-                *val = new.clone();
-            }
-        };
-
-        let replace_var = |var: &mut SymbolId| {
-            if let Value::Variable(replace) = new
-                && *var == old
-            {
-                *var = *replace;
-            }
-        };
-
         match self {
-            Define { .. } => (),
+            Define { .. } => Box::new(iter::empty()),
 
-            Assign { src, .. } => replace_val(src),
+            Assign { src, .. } => Box::new(iter::once(src)),
 
-            Binary { lhs, rhs, .. } => {
-                replace_val(lhs);
-                replace_val(rhs);
-            }
+            Binary { lhs, rhs, .. } => Box::new([lhs, rhs].into_iter()),
 
-            Extract { src, idxs, .. } => {
-                replace_var(src);
-                for idx in idxs {
-                    replace_val(idx);
-                }
-            }
+            Extract { src, idxs, .. } => Box::new(iter::once(src).chain(idxs)),
 
-            Insert { dst, idxs, src } => {
-                replace_var(dst);
-                for idx in idxs {
-                    replace_val(idx);
-                }
-                replace_val(src);
-            }
+            Insert { idxs, src, .. } => Box::new(idxs.iter_mut().chain(iter::once(src))),
 
-            ArrayLength { src, dim, .. } => {
-                replace_var(src);
-                replace_val(dim);
-            }
+            ArrayLength { src, dim, .. } => Box::new([src, dim].into_iter()),
 
-            TupleLength { src, .. } => replace_var(src),
+            TupleLength { src, .. } => Box::new(iter::once(src)),
 
             Call { callee, args } | CallResult { callee, args, .. } => {
-                if let Callee::Value(val) = callee {
-                    replace_val(val);
-                }
-                for arg in args {
-                    replace_val(arg);
-                }
+                Box::new(args.iter_mut().chain(match callee {
+                    Callee::Value(val) => Some(val),
+                    _ => None,
+                }))
             }
 
-            NewArray { dims, .. } => {
-                for dim in dims {
-                    replace_val(dim);
-                }
-            }
+            NewArray { dims, .. } => Box::new(dims.iter_mut()),
 
-            NewTuple { len, .. } => replace_val(len),
+            NewTuple { len, .. } => Box::new(iter::once(len)),
 
-            PhiNode { vals, .. } => {
-                for val in vals {
-                    replace_val(&mut val.val);
-                }
-            }
+            PhiNode { vals, .. } => Box::new(vals.iter_mut().map(|val| &mut val.val)),
         }
     }
 }
@@ -339,6 +292,7 @@ impl Statement for Instruction {
 impl DisplayResolved for Instruction {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         use Instruction::*;
+
         match self {
             Define { ty, var } => write!(f, "{} %{}", ty, var.resolved(interner)),
             Assign { dst, src } => {
@@ -359,7 +313,7 @@ impl DisplayResolved for Instruction {
             ),
             Extract { dst, src, idxs } => write!(
                 f,
-                "%{} <- %{}{}",
+                "%{} <- {}{}",
                 dst.resolved(interner),
                 src.resolved(interner),
                 idxs.iter()
@@ -369,7 +323,7 @@ impl DisplayResolved for Instruction {
             ),
             Insert { dst, idxs, src } => write!(
                 f,
-                "%{}{} <- {}",
+                "{}{} <- {}",
                 dst.resolved(interner),
                 idxs.iter()
                     .map(|idx| format!("[{}]", idx.resolved(interner)))
@@ -380,7 +334,7 @@ impl DisplayResolved for Instruction {
             ArrayLength { dst, src, dim } => {
                 write!(
                     f,
-                    "%{} <- length %{} {}",
+                    "%{} <- length {} {}",
                     dst.resolved(interner),
                     src.resolved(interner),
                     dim.resolved(interner)
@@ -388,7 +342,7 @@ impl DisplayResolved for Instruction {
             }
             TupleLength { dst, src } => write!(
                 f,
-                "%{} <- length %{}",
+                "%{} <- length {}",
                 dst.resolved(interner),
                 src.resolved(interner)
             ),
@@ -469,30 +423,19 @@ pub enum Terminator {
 }
 
 impl Statement for Terminator {
-    fn uses(&self) -> Box<dyn Iterator<Item = SymbolId> + '_> {
-        let var = |val: &Value| match val {
-            Value::Variable(var) => Some(*var),
-            _ => None,
-        };
-
+    fn uses(&self) -> Box<dyn Iterator<Item = &Value> + '_> {
         match self {
             Self::Branch(_) | Self::Return => Box::new(iter::empty()),
-            Self::BranchCondition { cond, .. } => Box::new(var(cond).into_iter()),
-            Self::ReturnValue(val) => Box::new(var(val).into_iter()),
+            Self::BranchCondition { cond, .. } => Box::new(iter::once(cond)),
+            Self::ReturnValue(val) => Box::new(iter::once(val)),
         }
     }
 
-    fn replace_use(&mut self, old: SymbolId, new: &Value) {
-        let replace_val = |val: &mut Value| {
-            if matches!(val, Value::Variable(var) if *var == old) {
-                *val = new.clone();
-            }
-        };
-
+    fn uses_mut(&mut self) -> Box<dyn Iterator<Item = &mut Value> + '_> {
         match self {
-            Self::Branch(_) | Self::Return => (),
-            Self::BranchCondition { cond, .. } => replace_val(cond),
-            Self::ReturnValue(val) => replace_val(val),
+            Self::Branch(_) | Self::Return => Box::new(iter::empty()),
+            Self::BranchCondition { cond, .. } => Box::new(iter::once(cond)),
+            Self::ReturnValue(val) => Box::new(iter::once(val)),
         }
     }
 }

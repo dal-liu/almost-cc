@@ -48,7 +48,7 @@ impl Register {
 
     pub const NUM_GP_REGISTERS: usize = 15;
 
-    pub fn gp_registers() -> impl Iterator<Item = Register> {
+    pub fn gp_registers() -> impl Iterator<Item = Self> {
         [Self::CALLER_SAVED, Self::CALLEE_SAVED]
             .into_iter()
             .flatten()
@@ -59,6 +59,7 @@ impl Register {
 impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Register::*;
+
         let reg = match self {
             RAX => "rax",
             RDI => "rdi",
@@ -420,6 +421,7 @@ impl Instruction {
 impl DisplayResolved for Instruction {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         use Instruction::*;
+
         match self {
             Assign { dst, src } => {
                 write!(
