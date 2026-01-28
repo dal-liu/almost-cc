@@ -31,6 +31,7 @@ fn place_phi_nodes(
 ) {
     let num_blocks = func.basic_blocks.len();
     let mut def_blocks = vec![BitVector::new(num_blocks); var_id_interner.len()];
+
     for param in &func.params {
         def_blocks[var_id_interner[&param.var]].set(0);
     }
@@ -97,7 +98,7 @@ fn rename_variables(
         let var = &mut param.var;
         let v = var_id_interner[var];
         let i = counter[v];
-        *var = SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(var.0), i)));
+        *var = new_var(string_interner, *var, i);
         stack[v].push(i);
         counter[v] += 1;
     }
@@ -122,25 +123,22 @@ fn dfs(
     stack: &mut [Vec<u32>],
     node: BlockId,
 ) {
-    let mut old_lhs = Vec::new();
-    let mut new_var = |old_var: SymbolId, i: u32| {
-        SymbolId(string_interner.intern(format!("{}{}", string_interner.resolve(old_var.0), i)))
-    };
-
     let block = &mut func.basic_blocks[node.0];
+    let mut old_lhs = Vec::new();
+
     for inst in block.instructions.iter_mut() {
         if !matches!(inst, Instruction::PhiNode { .. }) {
             for use_ in inst.uses().collect::<Vec<SymbolId>>() {
                 let v = var_id_interner[&use_];
                 let i = *stack[v].last().expect("stack should not be empty");
-                inst.replace_use(use_, &Value::Variable(new_var(use_, i)));
+                inst.replace_use(use_, &Value::Variable(new_var(string_interner, use_, i)));
             }
         }
 
         if let Some(def) = inst.defs() {
             let v = var_id_interner[&def];
             let i = counter[v];
-            inst.replace_def(new_var(def, i));
+            inst.replace_def(new_var(string_interner, def, i));
             stack[v].push(i);
             counter[v] += 1;
             old_lhs.push(v);
@@ -151,7 +149,7 @@ fn dfs(
     for use_ in term.uses().collect::<Vec<SymbolId>>() {
         let v = var_id_interner[&use_];
         let i = *stack[v].last().expect("stack should not be empty");
-        term.replace_use(use_, &Value::Variable(new_var(use_, i)));
+        term.replace_use(use_, &Value::Variable(new_var(string_interner, use_, i)));
     }
 
     let label = block.label;
@@ -165,7 +163,7 @@ fn dfs(
                 if let Value::Variable(var) = &mut val.val {
                     let v = var_id_interner[var];
                     let i = *stack[v].last().expect("stack should not be empty");
-                    *var = new_var(*var, i);
+                    *var = new_var(string_interner, *var, i);
                 }
             }
         }
@@ -186,4 +184,8 @@ fn dfs(
     for v in old_lhs {
         stack[v].pop();
     }
+}
+
+fn new_var(string_interner: &mut Interner<String>, old_var: SymbolId, i: u32) -> SymbolId {
+    SymbolId(string_interner.intern(format!("{}_{}", string_interner.resolve(old_var.0), i)))
 }

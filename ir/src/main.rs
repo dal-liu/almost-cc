@@ -33,7 +33,7 @@ fn main() {
             println!("{}", func.resolved(&prog.interner));
 
             propagate_constants(func);
-            // println!("{}", func.resolved(&prog.interner));
+            println!("{}", func.resolved(&prog.interner));
         }
     }
 }

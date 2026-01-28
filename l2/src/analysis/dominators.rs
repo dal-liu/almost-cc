@@ -48,10 +48,10 @@ impl DominatorTree {
             .map(|dom| dom.iter().max_by_key(|&n| sdom[n].count()).map(BlockId))
             .collect();
 
-        let mut children = vec![BitVector::new(num_blocks); num_blocks];
+        let mut tree = vec![BitVector::new(num_blocks); num_blocks];
         for (node, parent) in idom.iter().enumerate() {
             if let Some(parent) = parent {
-                children[parent.0].set(node);
+                tree[parent.0].set(node);
             }
         }
 
@@ -61,7 +61,7 @@ impl DominatorTree {
 
         fn dfs(
             node: BlockId,
-            children: &[BitVector],
+            tree: &[BitVector],
             counter: &mut u32,
             preorder: &mut [u32],
             postorder: &mut [u32],
@@ -70,21 +70,15 @@ impl DominatorTree {
             preorder[i] = *counter;
             *counter += 1;
 
-            for child in &children[i] {
-                dfs(BlockId(child), children, counter, preorder, postorder);
+            for child in &tree[i] {
+                dfs(BlockId(child), tree, counter, preorder, postorder);
             }
 
             postorder[i] = *counter;
             *counter += 1;
         }
 
-        dfs(
-            entry_id,
-            &children,
-            &mut counter,
-            &mut preorder,
-            &mut postorder,
-        );
+        dfs(entry_id, &tree, &mut counter, &mut preorder, &mut postorder);
 
         Self {
             preorder,
