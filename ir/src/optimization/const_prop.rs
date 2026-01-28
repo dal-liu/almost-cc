@@ -4,7 +4,7 @@ use crate::analysis::use_def::{Operand, UseDefChain};
 
 type StmtId = usize;
 
-pub fn propagate_constants(func: &mut Function) -> bool {
+pub fn constant_propagation(func: &mut Function) -> bool {
     let use_def = UseDefChain::new(func);
     let mut modified = false;
 

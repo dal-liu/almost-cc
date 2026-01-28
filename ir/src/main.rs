@@ -6,7 +6,7 @@ mod ssa;
 use clap::Parser;
 use utils::DisplayResolved;
 
-use crate::optimization::propagate_constants;
+use crate::optimization::{constant_propagation, run_peephole_passes};
 use crate::parser::parse_file;
 use crate::ssa::construct_ssa_form;
 
@@ -30,9 +30,17 @@ fn main() {
 
         for func in &mut prog.functions {
             construct_ssa_form(func, &mut prog.interner);
-            println!("{}", func.resolved(&prog.interner));
 
-            propagate_constants(func);
+            loop {
+                let mut modified = false;
+                modified |= constant_propagation(func);
+                modified |= run_peephole_passes(func);
+
+                if !modified {
+                    break;
+                }
+            }
+
             println!("{}", func.resolved(&prog.interner));
         }
     }
