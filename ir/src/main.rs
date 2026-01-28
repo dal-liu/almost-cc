@@ -1,14 +1,14 @@
 mod analysis;
-mod optimization;
 mod parser;
 mod ssa;
+mod transform;
 
 use clap::Parser;
 use utils::DisplayResolved;
 
-use crate::optimization::{constant_propagation, run_peephole_passes};
 use crate::parser::parse_file;
 use crate::ssa::construct_ssa_form;
+use crate::transform::{constant_folding, constant_propagation};
 
 #[derive(Parser)]
 struct Cli {
@@ -34,7 +34,7 @@ fn main() {
             loop {
                 let mut modified = false;
                 modified |= constant_propagation(func);
-                modified |= run_peephole_passes(func);
+                modified |= constant_folding(func);
 
                 if !modified {
                     break;

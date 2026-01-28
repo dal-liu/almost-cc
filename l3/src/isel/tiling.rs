@@ -46,15 +46,6 @@ macro_rules! pat {
         }
     };
 
-    (pow) => {
-        Pattern {
-            children: Vec::new(),
-            matches: |forest, id, _| {
-                matches!(forest.result(id), Some(Value::Number(num)) if *num > 0 && *num & (*num - 1) == 0).then_some(None)
-            },
-        }
-    };
-
     (scale) => {
         Pattern {
             children: Vec::new(),
@@ -694,76 +685,6 @@ pub fn isel_tiles() -> Vec<Tile> {
                 dst: forest.translate_node(forest.child(forest.child(root, 0), 0)),
                 offset: -*offset,
                 src: forest.translate_node(forest.child(root, 1)),
-            }]
-        },
-    );
-
-    // VAR <- VAL * POW
-    let mul_by_pow_any_left = Tile::new(pat!(Mul(pat!(any), pat!(pow))), 2, |forest, root| {
-        let Some(Value::Number(num)) = forest.result(forest.child(root, 1)) else {
-            unreachable!("pattern should have a power of 2")
-        };
-        let dst = forest.translate_node(root);
-        vec![
-            l2::Instruction::Assign {
-                dst,
-                src: forest.translate_node(forest.child(root, 0)),
-            },
-            l2::Instruction::Shift {
-                dst,
-                sop: l2::ShiftOp::ShlAssign,
-                src: l2::Value::Number(num.trailing_zeros().into()),
-            },
-        ]
-    });
-
-    // VAR <- POW * VAL
-    let mul_by_pow_any_right = Tile::new(pat!(Mul(pat!(pow), pat!(any))), 2, |forest, root| {
-        let Some(Value::Number(num)) = forest.result(forest.child(root, 0)) else {
-            unreachable!("pattern should have a power of 2")
-        };
-        let dst = forest.translate_node(root);
-        vec![
-            l2::Instruction::Assign {
-                dst,
-                src: forest.translate_node(forest.child(root, 1)),
-            },
-            l2::Instruction::Shift {
-                dst,
-                sop: l2::ShiftOp::ShlAssign,
-                src: l2::Value::Number(num.trailing_zeros().into()),
-            },
-        ]
-    });
-
-    // VAR <- VAR * POW
-    let mul_by_pow_exact_left = Tile::new(
-        pat!(Mul(pat!(exact), pat!(pow)) -> res),
-        1,
-        |forest, root| {
-            let Some(Value::Number(num)) = forest.result(forest.child(root, 1)) else {
-                unreachable!("pattern should have a power of 2")
-            };
-            vec![l2::Instruction::Shift {
-                dst: forest.translate_node(root),
-                sop: l2::ShiftOp::ShlAssign,
-                src: l2::Value::Number(num.trailing_zeros().into()),
-            }]
-        },
-    );
-
-    // VAR <- POW * VAR
-    let mul_by_pow_exact_right = Tile::new(
-        pat!(Mul(pat!(pow), pat!(exact)) -> res),
-        1,
-        |forest, root| {
-            let Some(Value::Number(num)) = forest.result(forest.child(root, 0)) else {
-                unreachable!("pattern should have a power of 2")
-            };
-            vec![l2::Instruction::Shift {
-                dst: forest.translate_node(root),
-                sop: l2::ShiftOp::ShlAssign,
-                src: l2::Value::Number(num.trailing_zeros().into()),
             }]
         },
     );
@@ -1662,10 +1583,6 @@ pub fn isel_tiles() -> Vec<Tile> {
     );
 
     vec![
-        mul_by_pow_any_left,
-        mul_by_pow_any_right,
-        mul_by_pow_exact_left,
-        mul_by_pow_exact_right,
         increment_any_left,
         increment_any_right,
         increment_exact_left,
