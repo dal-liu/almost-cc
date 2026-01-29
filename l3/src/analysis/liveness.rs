@@ -14,8 +14,8 @@ pub struct LivenessResult {
 }
 
 impl LivenessResult {
-    pub fn is_dead_at(&self, b: BlockId, i: InstId, id: SymbolId) -> bool {
-        !self.out[b.0][i].test(self.interner[&id])
+    pub fn is_dead_at(&self, block_id: BlockId, inst_id: InstId, symbol_id: SymbolId) -> bool {
+        !self.out[block_id.0][inst_id].test(self.interner[&symbol_id])
     }
 }
 

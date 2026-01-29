@@ -8,7 +8,7 @@ use utils::DisplayResolved;
 
 use crate::parser::parse_file;
 use crate::ssa::construct_ssa_form;
-use crate::transform::{constant_folding, constant_propagation};
+use crate::transform::{algebraic_simplification, constant_folding, constant_propagation};
 
 #[derive(Parser)]
 struct Cli {
@@ -35,6 +35,7 @@ fn main() {
                 let mut modified = false;
                 modified |= constant_propagation(func);
                 modified |= constant_folding(func);
+                modified |= algebraic_simplification(func);
 
                 if !modified {
                     break;
