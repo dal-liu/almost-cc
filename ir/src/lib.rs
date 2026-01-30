@@ -5,20 +5,6 @@ use std::iter;
 
 use utils::{DisplayResolved, Interner};
 
-pub trait Statement {
-    fn defs(&self) -> Option<&SymbolId> {
-        None
-    }
-
-    fn uses(&self) -> Box<dyn Iterator<Item = &Value> + '_>;
-
-    fn defs_mut(&mut self) -> Option<&mut SymbolId> {
-        None
-    }
-
-    fn uses_mut(&mut self) -> Box<dyn Iterator<Item = &mut Value> + '_>;
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
     Int64,
@@ -175,14 +161,22 @@ pub enum Instruction {
         dst: SymbolId,
         len: Value,
     },
+    Branch(SymbolId),
+    BranchCondition {
+        cond: Value,
+        true_label: SymbolId,
+        false_label: SymbolId,
+    },
+    Return,
+    ReturnValue(Value),
     PhiNode {
         dst: SymbolId,
         vals: Vec<PhiValue>,
     },
 }
 
-impl Statement for Instruction {
-    fn defs(&self) -> Option<&SymbolId> {
+impl Instruction {
+    pub fn defs(&self) -> Option<&SymbolId> {
         use Instruction::*;
 
         match self {
@@ -198,15 +192,20 @@ impl Statement for Instruction {
             | NewTuple { dst, .. }
             | PhiNode { dst, .. } => Some(dst),
 
-            Insert { .. } | Call { .. } => None,
+            Insert { .. }
+            | Call { .. }
+            | Branch(_)
+            | BranchCondition { .. }
+            | Return
+            | ReturnValue(_) => None,
         }
     }
 
-    fn uses(&self) -> Box<dyn Iterator<Item = &Value> + '_> {
+    pub fn uses(&self) -> Box<dyn Iterator<Item = &Value> + '_> {
         use Instruction::*;
 
         match self {
-            Define { .. } => Box::new(iter::empty()),
+            Define { .. } | Branch(_) | Return => Box::new(iter::empty()),
 
             Assign { src, .. } => Box::new(iter::once(src)),
 
@@ -231,11 +230,15 @@ impl Statement for Instruction {
 
             NewTuple { len, .. } => Box::new(iter::once(len)),
 
+            BranchCondition { cond, .. } => Box::new(iter::once(cond)),
+
+            ReturnValue(val) => Box::new(iter::once(val)),
+
             PhiNode { vals, .. } => Box::new(vals.iter().map(|val| &val.val)),
         }
     }
 
-    fn defs_mut(&mut self) -> Option<&mut SymbolId> {
+    pub fn defs_mut(&mut self) -> Option<&mut SymbolId> {
         use Instruction::*;
 
         match self {
@@ -251,15 +254,20 @@ impl Statement for Instruction {
             | NewTuple { dst, .. }
             | PhiNode { dst, .. } => Some(dst),
 
-            Insert { .. } | Call { .. } => None,
+            Insert { .. }
+            | Call { .. }
+            | Branch(_)
+            | BranchCondition { .. }
+            | Return
+            | ReturnValue(_) => None,
         }
     }
 
-    fn uses_mut(&mut self) -> Box<dyn Iterator<Item = &mut Value> + '_> {
+    pub fn uses_mut(&mut self) -> Box<dyn Iterator<Item = &mut Value> + '_> {
         use Instruction::*;
 
         match self {
-            Define { .. } => Box::new(iter::empty()),
+            Define { .. } | Branch(_) | Return => Box::new(iter::empty()),
 
             Assign { src, .. } => Box::new(iter::once(src)),
 
@@ -283,6 +291,10 @@ impl Statement for Instruction {
             NewArray { dims, .. } => Box::new(dims.iter_mut()),
 
             NewTuple { len, .. } => Box::new(iter::once(len)),
+
+            BranchCondition { cond, .. } => Box::new(iter::once(cond)),
+
+            ReturnValue(val) => Box::new(iter::once(val)),
 
             PhiNode { vals, .. } => Box::new(vals.iter_mut().map(|val| &mut val.val)),
         }
@@ -380,6 +392,20 @@ impl DisplayResolved for Instruction {
                 dst.resolved(interner),
                 len.resolved(interner)
             ),
+            Branch(label) => write!(f, "br :{}", label.resolved(interner)),
+            BranchCondition {
+                cond,
+                true_label,
+                false_label,
+            } => write!(
+                f,
+                "br {} :{} :{}",
+                cond.resolved(interner),
+                true_label.resolved(interner),
+                false_label.resolved(interner)
+            ),
+            Return => write!(f, "return"),
+            ReturnValue(val) => write!(f, "return {}", val.resolved(interner)),
             PhiNode { dst, vals } => write!(
                 f,
                 "%{} <- phi {}",
@@ -411,61 +437,10 @@ impl DisplayResolved for PhiValue {
 }
 
 #[derive(Debug, Clone)]
-pub enum Terminator {
-    Branch(SymbolId),
-    BranchCondition {
-        cond: Value,
-        true_label: SymbolId,
-        false_label: SymbolId,
-    },
-    Return,
-    ReturnValue(Value),
-}
-
-impl Statement for Terminator {
-    fn uses(&self) -> Box<dyn Iterator<Item = &Value> + '_> {
-        match self {
-            Self::Branch(_) | Self::Return => Box::new(iter::empty()),
-            Self::BranchCondition { cond, .. } => Box::new(iter::once(cond)),
-            Self::ReturnValue(val) => Box::new(iter::once(val)),
-        }
-    }
-
-    fn uses_mut(&mut self) -> Box<dyn Iterator<Item = &mut Value> + '_> {
-        match self {
-            Self::Branch(_) | Self::Return => Box::new(iter::empty()),
-            Self::BranchCondition { cond, .. } => Box::new(iter::once(cond)),
-            Self::ReturnValue(val) => Box::new(iter::once(val)),
-        }
-    }
-}
-
-impl DisplayResolved for Terminator {
-    fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
-        match self {
-            Self::Branch(label) => write!(f, "br :{}", label.resolved(interner)),
-            Self::BranchCondition {
-                cond,
-                true_label,
-                false_label,
-            } => write!(
-                f,
-                "br {} :{} :{}",
-                cond.resolved(interner),
-                true_label.resolved(interner),
-                false_label.resolved(interner)
-            ),
-            Self::Return => write!(f, "return"),
-            Self::ReturnValue(val) => write!(f, "return {}", val.resolved(interner)),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct BasicBlock {
     pub label: SymbolId,
     pub instructions: Vec<Instruction>,
-    pub terminator: Terminator,
+    pub terminator: Instruction,
 }
 
 impl DisplayResolved for BasicBlock {
@@ -544,12 +519,12 @@ impl ControlFlowGraph {
 
         for (i, block) in basic_blocks.iter().enumerate() {
             match &block.terminator {
-                Terminator::Branch(label) => {
+                Instruction::Branch(label) => {
                     let succ = id_map[label];
                     successors[i].push(succ);
                     predecessors[succ.0].push(BlockId(i));
                 }
-                Terminator::BranchCondition {
+                Instruction::BranchCondition {
                     true_label,
                     false_label,
                     ..

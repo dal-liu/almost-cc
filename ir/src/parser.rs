@@ -313,32 +313,32 @@ fn instruction<'src>() -> impl Parser<'src, &'src str, Instruction, IRExtra<'src
     .padded()
 }
 
-fn terminator<'src>() -> impl Parser<'src, &'src str, Terminator, IRExtra<'src>> {
+fn terminator<'src>() -> impl Parser<'src, &'src str, Instruction, IRExtra<'src>> {
     let br_keyword = just("br").padded_by(separators());
     let return_keyword = just("return").padded_by(separators());
 
-    let branch = br_keyword.ignore_then(
-        label_name()
-            .map_with(|label, e| Terminator::Branch(SymbolId(e.state().intern(label.to_owned())))),
-    );
+    let branch = br_keyword
+        .ignore_then(label_name().map_with(|label, e| {
+            Instruction::Branch(SymbolId(e.state().intern(label.to_owned())))
+        }));
 
     let branch_condition = br_keyword
         .ignore_then(variable_or_number())
         .then(label_name())
         .then(label_name())
         .map_with(
-            |((cond, true_label), false_label), e| Terminator::BranchCondition {
+            |((cond, true_label), false_label), e| Instruction::BranchCondition {
                 cond,
                 true_label: SymbolId(e.state().intern(true_label.to_owned())),
                 false_label: SymbolId(e.state().intern(false_label.to_owned())),
             },
         );
 
-    let return_inst = return_keyword.to(Terminator::Return);
+    let return_inst = return_keyword.to(Instruction::Return);
 
     let return_value = return_keyword
         .ignore_then(variable_or_number())
-        .map(Terminator::ReturnValue);
+        .map(Instruction::ReturnValue);
 
     choice((branch, branch_condition, return_value, return_inst))
         .padded_by(comment().repeated())

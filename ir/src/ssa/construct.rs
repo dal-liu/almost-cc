@@ -1,3 +1,5 @@
+use std::iter;
+
 use ir::*;
 use utils::{BitVector, Interner, Worklist};
 
@@ -126,7 +128,11 @@ fn dfs(
     let block = &mut func.basic_blocks[node.0];
     let mut old_lhs = Vec::new();
 
-    for inst in &mut block.instructions {
+    for inst in block
+        .instructions
+        .iter_mut()
+        .chain(iter::once(&mut block.terminator))
+    {
         if !matches!(inst, Instruction::PhiNode { .. }) {
             for use_ in inst.uses_mut().filter_map(|val| match val {
                 Value::Variable(var) => Some(var),
@@ -146,16 +152,6 @@ fn dfs(
             counter[v] += 1;
             old_lhs.push(v);
         }
-    }
-
-    let term = &mut block.terminator;
-    for use_ in term.uses_mut().filter_map(|val| match val {
-        Value::Variable(var) => Some(var),
-        _ => None,
-    }) {
-        let v = var_id_interner[&use_];
-        let i = *stack[v].last().expect("stack should not be empty");
-        *use_ = new_var(string_interner, *use_, i);
     }
 
     let label = block.label;

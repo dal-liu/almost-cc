@@ -48,8 +48,8 @@ impl UseDefChain {
         Self { def_table }
     }
 
-    pub fn operands(&self, stmt: &impl Statement) -> impl Iterator<Item = &Operand> {
-        stmt.uses().map(|use_| match use_ {
+    pub fn operands(&self, inst: &Instruction) -> impl Iterator<Item = &Operand> {
+        inst.uses().map(|use_| match use_ {
             Value::Variable(var) => &self.def_table[var],
             Value::Function(_) | Value::Number(_) => &Operand::Constant,
         })
