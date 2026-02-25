@@ -4,7 +4,7 @@ use l2;
 use l3::*;
 
 use crate::isel::forest::{NodeId, NodeKind, OpKind, SelectionForest};
-use crate::translation::{translate_symbol_id, translate_value};
+use crate::translate::{translate_symbol_id, translate_value};
 
 macro_rules! pat {
     (any) => {

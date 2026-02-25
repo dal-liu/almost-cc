@@ -12,7 +12,7 @@ use crate::analysis::reaching_def::compute_reaching_def;
 use crate::isel::contexts::create_contexts;
 use crate::isel::forest::{NodeId, NodeKind, SelectionForest, generate_forest};
 use crate::isel::tiling::{Cover, cover_forest, isel_tiles};
-use crate::translation::{translate_symbol_id, translate_value};
+use crate::translate::{translate_symbol_id, translate_value};
 
 const LABEL_OFFSET: usize = 1;
 

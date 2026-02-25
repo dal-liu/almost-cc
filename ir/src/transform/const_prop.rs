@@ -1,43 +1,34 @@
 use std::iter;
 
 use ir::*;
+use utils::{Interner, Worklist};
 
+use crate::analysis::def_use::DefUseChain;
 use crate::analysis::use_def::{Operand, UseDefChain};
+use crate::transform::pass::{FunctionPass, PassContext};
 
-pub fn constant_propagation(func: &mut Function) -> bool {
-    let use_def = UseDefChain::new(func);
-    let mut modified = false;
+enum LatticeCell {
+    Unknown,
+    Constant(Value),
+    Overdefined,
+}
 
-    for block in &mut func.basic_blocks {
-        for inst in block
-            .instructions
-            .iter_mut()
-            .chain(iter::once(&mut block.terminator))
-        {
-            let operands: Vec<&Operand> = use_def.operands(inst).collect();
+pub struct SCCPPass;
 
-            for (use_, op) in inst.uses_mut().into_iter().zip(operands) {
-                if let Operand::Local(def_inst) = op {
-                    match def_inst {
-                        Instruction::Assign { src, .. } if matches!(src, Value::Number(_)) => {
-                            *use_ = src.clone();
-                            modified = true;
-                        }
-                        Instruction::PhiNode { vals, .. } => {
-                            let mut it = vals.iter().map(|val| &val.val);
-                            if let Some(Value::Number(first)) = it.next() {
-                                if it.all(|val| matches!(val, Value::Number(num) if num == first)) {
-                                    *use_ = Value::Number(*first);
-                                    modified = true;
-                                }
-                            };
-                        }
-                        _ => (),
-                    }
-                }
-            }
-        }
+impl FunctionPass for SCCPPass {
+    fn run(func: &mut Function, ctx: &mut PassContext) -> bool {
+        let def_use = DefUseChain::new(func);
+
+        let mut ssa_worklist = Worklist::new();
+        let mut flow_worklist = Worklist::new();
+        let mut executable_flag = HashMap::new();
+
+        flow_worklist.extend(
+            func.cfg.successors[0]
+                .iter()
+                .map(|&succ| (BlockId(0), succ)),
+        );
+
+        false
     }
-
-    modified
 }

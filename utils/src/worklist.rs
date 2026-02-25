@@ -16,23 +16,23 @@ impl<T: Copy + Eq + Hash> Worklist<T> {
     }
 
     pub fn pop(&mut self) -> Option<T> {
-        self.queue.pop_front().and_then(|id| {
-            self.set.remove(&id);
-            Some(id)
+        self.queue.pop_front().and_then(|item| {
+            self.set.remove(&item);
+            Some(item)
         })
     }
 
-    pub fn push(&mut self, id: T) {
-        if self.set.insert(id) {
-            self.queue.push_back(id);
+    pub fn push(&mut self, item: T) {
+        if self.set.insert(item) {
+            self.queue.push_back(item);
         }
     }
 }
 
 impl<T: Copy + Eq + Hash> Extend<T> for Worklist<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        for id in iter {
-            self.push(id);
+        for item in iter {
+            self.push(item);
         }
     }
 }

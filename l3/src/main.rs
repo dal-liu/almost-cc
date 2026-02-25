@@ -3,7 +3,7 @@ mod codegen;
 mod isel;
 mod mangling;
 mod parser;
-mod translation;
+mod translate;
 
 use clap::Parser;
 

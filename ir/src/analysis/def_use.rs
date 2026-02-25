@@ -29,9 +29,7 @@ impl DefUseChain {
         Self { users }
     }
 
-    pub fn users(&self, inst: &Instruction) -> impl Iterator<Item = &Instruction> {
-        inst.defs()
-            .into_iter()
-            .flat_map(|def| self.users.get(def).into_iter().flatten())
+    pub fn users(&self, def: SymbolId) -> impl Iterator<Item = &Instruction> {
+        self.users.get(&def).into_iter().flatten()
     }
 }
