@@ -1,6 +1,6 @@
 ## About
 
-This is a compiler that lowers a C-like language into x86 assembly, built (almost) entirely from scratch in Rust. I previously implemented this in C++ for the [Compiler Construction course](https://users.cs.northwestern.edu/~simonec/CC.html) at Northwestern University, but I thought it would be fun to revisit it in Rust this time. (It is!)
+This is a compiler that lowers a C-like language into x86 assembly, built (almost) entirely from scratch in Rust. I previously implemented this in C++ for the [Compiler Construction course](https://users.cs.northwestern.edu/~simonec/CC.html) at Northwestern University, but I rewrote it in Rust just for fun.
 
 ## Language
 
@@ -24,4 +24,4 @@ Explicit control flow to enable easy analysis and transformation. The IR compile
 
 ## Acknowledgements
 
-Special thanks to Prof. Campanoni for being an excellent CC instructor and inspiring my love for compilers.
+Special thanks to Prof. Campanoni for inspiring my interest in compilers.
