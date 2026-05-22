@@ -17,10 +17,10 @@ pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) 
 
     loop {
         let liveness = compute_liveness(func);
-        let mut interference = InterferenceGraph::new(func, &liveness);
+        let interference = InterferenceGraph::new(func, &liveness);
         let dominators = DominatorTree::new(func);
         let loops = LoopForest::new(func, &dominators);
-        let coloring = color_graph(func, &liveness, &mut interference, &loops, &prev_spilled);
+        let coloring = color_graph(func, &liveness, interference, &loops, &prev_spilled);
 
         if coloring.spill_nodes.is_empty() {
             rewrite_program(func, &coloring);

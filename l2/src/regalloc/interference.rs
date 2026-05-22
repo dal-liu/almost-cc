@@ -8,17 +8,15 @@ use crate::analysis::liveness::LivenessResult;
 type NodeId = usize;
 
 #[derive(Debug)]
-pub struct InterferenceGraph<'a> {
+pub struct InterferenceGraph {
     pub graph: Vec<BitVector>,
-    pub interner: &'a Interner<Value>,
 }
 
-impl<'a> InterferenceGraph<'a> {
-    pub fn new(func: &Function, liveness: &'a LivenessResult) -> Self {
+impl InterferenceGraph {
+    pub fn new(func: &Function, liveness: &LivenessResult) -> Self {
         let num_gp_vars = liveness.interner.len();
         let mut graph = Self {
             graph: vec![BitVector::new(num_gp_vars); num_gp_vars],
-            interner: &liveness.interner,
         };
 
         let gp_registers: Vec<NodeId> = Register::gp_registers()
@@ -41,8 +39,8 @@ impl<'a> InterferenceGraph<'a> {
                         live.reset(liveness.interner[src]);
                     }
                     Instruction::Shift { src, .. } if matches!(src, Value::Variable(_)) => {
-                        let rcx = graph.interner[&Value::Register(Register::RCX)];
-                        let u = graph.interner[src];
+                        let rcx = liveness.interner[&Value::Register(Register::RCX)];
+                        let u = liveness.interner[src];
                         for &v in &gp_registers {
                             if v != rcx {
                                 graph.add_edge(u, v);
@@ -83,14 +81,32 @@ impl<'a> InterferenceGraph<'a> {
     pub fn degree(&self, id: NodeId) -> NodeId {
         self.graph[id].count()
     }
+
+    pub fn num_nodes(&self) -> usize {
+        self.graph.len()
+    }
+
+    #[allow(dead_code)]
+    pub fn display<'a>(&'a self, interner: &'a Interner<Value>) -> InterferenceGraphDisplay<'a> {
+        InterferenceGraphDisplay {
+            interference: self,
+            interner,
+        }
+    }
 }
 
-impl DisplayResolved for InterferenceGraph<'_> {
+#[derive(Debug)]
+pub struct InterferenceGraphDisplay<'a> {
+    interference: &'a InterferenceGraph,
+    interner: &'a Interner<Value>,
+}
+
+impl DisplayResolved for InterferenceGraphDisplay<'_> {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
-        let mut lines: Vec<String> = (0..self.graph.len())
+        let mut lines: Vec<String> = (0..self.interference.num_nodes())
             .into_iter()
             .map(|i| {
-                let mut line: Vec<String> = self.graph[i]
+                let mut line: Vec<String> = self.interference.graph[i]
                     .iter()
                     .map(|j| self.interner.resolve(j).resolved(interner).to_string())
                     .collect();
