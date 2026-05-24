@@ -45,7 +45,7 @@ impl CodeGenerator {
     ) -> io::Result<()> {
         writeln!(self.stream, "(@main")?;
 
-        for func in &prog.functions {
+        for func in &mut prog.functions {
             self.emit_function(func, &mut prog.interner, prefix, suffix)?;
         }
 
@@ -54,7 +54,7 @@ impl CodeGenerator {
 
     fn emit_function(
         &mut self,
-        func: &Function,
+        func: &mut Function,
         interner: &mut Interner<String>,
         prefix: &str,
         suffix: &mut u32,
@@ -128,7 +128,7 @@ impl CodeGenerator {
             }
 
             if let Some(term) = ctx.terminator {
-                let inst = &func.basic_blocks[ctx.block_id.0].instructions[term];
+                let inst = func.instruction(term);
                 self.emit_instruction(inst, interner, prefix, suffix)?;
             }
         }

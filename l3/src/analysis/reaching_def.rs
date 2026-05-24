@@ -6,21 +6,38 @@ use utils::{BitVector, DisplayResolved, Interner};
 
 use crate::analysis::dataflow::{Dataflow, Direction};
 
-type InstId = usize;
-
 #[derive(Debug)]
 pub struct ReachingDefResult {
-    pub interner: Interner<Instruction>,
+    pub interner: Interner<InstId>,
     pub in_: Vec<Vec<BitVector>>,
 }
 
-impl DisplayResolved for ReachingDefResult {
+impl ReachingDefResult {
+    #[allow(dead_code)]
+    pub fn display<'a>(&'a self, func: &'a Function) -> ReachingDefResultDisplay<'a> {
+        ReachingDefResultDisplay {
+            func,
+            reaching_def: self,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ReachingDefResultDisplay<'a> {
+    func: &'a Function,
+    reaching_def: &'a ReachingDefResult,
+}
+
+impl DisplayResolved for ReachingDefResultDisplay<'_> {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
-        for vec in &self.in_ {
+        for vec in &self.reaching_def.in_ {
             for bitvec in vec {
                 let mut lines: Vec<String> = bitvec
                     .iter()
-                    .map(|k| format!("{}\n", self.interner.resolve(k).resolved(interner)))
+                    .map(|idx| {
+                        let inst_id = *self.reaching_def.interner.resolve(idx);
+                        format!("{}\n", self.func.instruction(inst_id).resolved(interner))
+                    })
                     .collect();
                 lines.sort();
                 writeln!(f, "IN\n{{\n{}}}", lines.join(""))?;
@@ -32,49 +49,57 @@ impl DisplayResolved for ReachingDefResult {
 
 #[derive(Debug)]
 struct ReachingDefAnalysis {
-    interner: Interner<Instruction>,
-    def_table: HashMap<SymbolId, Vec<InstId>>,
+    interner: Interner<InstId>,
+    def_table: HashMap<SymbolId, BitVector>,
     block_gen: Vec<BitVector>,
     block_kill: Vec<BitVector>,
 }
 
 impl ReachingDefAnalysis {
     pub fn new(func: &Function) -> Self {
-        let (interner, def_table) = func
+        let interner = func
             .basic_blocks
             .iter()
-            .flat_map(|block| &block.instructions)
-            .fold(
-                (Interner::new(), HashMap::new()),
-                |(mut interner, mut def_table), inst| {
-                    let index = interner.intern(inst.clone());
-                    if let Some(def) = inst.defs() {
-                        def_table.entry(def).or_insert(Vec::new()).push(index);
-                    }
-                    (interner, def_table)
-                },
-            );
+            .enumerate()
+            .flat_map(|(i, block)| (0..block.instructions.len()).map(move |j| InstId(i, j)))
+            .fold(Interner::new(), |mut interner, inst_id| {
+                interner.intern(inst_id);
+                interner
+            });
 
         let num_insts = interner.len();
+        let mut def_table = HashMap::new();
+
+        for (i, block) in func.basic_blocks.iter().enumerate() {
+            for (j, inst) in block.instructions.iter().enumerate() {
+                if let Some(def) = inst.defs() {
+                    def_table
+                        .entry(def)
+                        .or_insert(BitVector::new(num_insts))
+                        .set(interner[&InstId(i, j)]);
+                }
+            }
+        }
+
         let num_blocks = func.basic_blocks.len();
         let mut block_gen = vec![BitVector::new(num_insts); num_blocks];
         let mut block_kill = vec![BitVector::new(num_insts); num_blocks];
 
         for (i, block) in func.basic_blocks.iter().enumerate() {
-            for inst in block.instructions.iter().rev() {
+            for (j, inst) in block.instructions.iter().enumerate().rev() {
                 let Some(def) = inst.defs() else {
                     continue;
                 };
 
-                let j = interner[inst];
-                if !block_kill[i].test(j) {
-                    block_gen[i].set(j);
+                let k = interner[&InstId(i, j)];
+                if !block_kill[i].test(k) {
+                    block_gen[i].set(k);
                 }
 
                 block_kill[i].set_from(
                     def_table[&def]
                         .iter()
-                        .filter_map(|&id| (j != id).then_some(id)),
+                        .filter_map(|id| (k != id).then_some(id)),
                 );
             }
         }
@@ -99,18 +124,18 @@ impl Dataflow for ReachingDefAnalysis {
         current.union(&other);
     }
 
-    fn transfer(&self, input: &BitVector, id: BlockId) -> BitVector {
+    fn transfer(&self, input: &BitVector, block_id: BlockId) -> BitVector {
         let mut output = input.clone();
-        output.difference(&self.block_kill[id.0]);
-        output.union(&self.block_gen[id.0]);
+        output.difference(&self.block_kill[block_id.0]);
+        output.union(&self.block_gen[block_id.0]);
         output
     }
 }
 
-pub fn compute_reaching_def(func: &Function) -> ReachingDefResult {
-    let mut func_clone = func.clone();
+pub fn compute_reaching_def(func: &mut Function) -> ReachingDefResult {
+    let has_params = !func.params.is_empty();
 
-    if !func.params.is_empty() {
+    if has_params {
         let dummy_block = BasicBlock {
             instructions: func
                 .params
@@ -121,18 +146,17 @@ pub fn compute_reaching_def(func: &Function) -> ReachingDefResult {
                 })
                 .collect(),
         };
-        func_clone.cfg.predecessors[0].push(BlockId(func.basic_blocks.len()));
-        func_clone.cfg.predecessors.push(vec![]);
-        func_clone.cfg.successors.push(vec![BlockId(0)]);
-        func_clone.basic_blocks.push(dummy_block);
+        func.cfg.predecessors[0].push(BlockId(func.basic_blocks.len()));
+        func.cfg.predecessors.push(vec![]);
+        func.cfg.successors.push(vec![BlockId(0)]);
+        func.basic_blocks.push(dummy_block);
     }
 
-    let reaching_def = ReachingDefAnalysis::new(&func_clone);
-    let (block_in, _) = reaching_def.solve(&func_clone);
+    let reaching_def = ReachingDefAnalysis::new(func);
+    let (block_in, _) = reaching_def.solve(func);
 
     let empty_dataflow_set = || -> Vec<Vec<BitVector>> {
-        func_clone
-            .basic_blocks
+        func.basic_blocks
             .iter()
             .map(|block| {
                 vec![BitVector::new(reaching_def.interner.len()); block.instructions.len()]
@@ -143,7 +167,7 @@ pub fn compute_reaching_def(func: &Function) -> ReachingDefResult {
     let mut inst_in = empty_dataflow_set();
     let mut inst_out = empty_dataflow_set();
 
-    for (i, block) in func_clone.basic_blocks.iter().enumerate() {
+    for (i, block) in func.basic_blocks.iter().enumerate() {
         for (j, inst) in block.instructions.iter().enumerate() {
             inst_in[i][j] = if j == 0 {
                 block_in[i].clone()
@@ -153,15 +177,23 @@ pub fn compute_reaching_def(func: &Function) -> ReachingDefResult {
 
             inst_out[i][j] = inst_in[i][j].clone();
             if let Some(def) = inst.defs() {
-                let k = reaching_def.interner[inst];
+                let k = reaching_def.interner[&InstId(i, j)];
                 inst_out[i][j].reset_from(
                     reaching_def.def_table[&def]
                         .iter()
-                        .filter_map(|&id| (k != id).then_some(id)),
+                        .filter_map(|idx| (k != idx).then_some(idx)),
                 );
                 inst_out[i][j].set(k);
             }
         }
+    }
+
+    if has_params {
+        inst_in.pop();
+        func.basic_blocks.pop();
+        func.cfg.successors.pop();
+        func.cfg.predecessors.pop();
+        func.cfg.predecessors[0].pop();
     }
 
     ReachingDefResult {

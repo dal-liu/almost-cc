@@ -147,6 +147,9 @@ pub enum Instruction {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InstId(pub usize, pub usize);
+
 impl Instruction {
     pub fn defs(&self) -> Option<SymbolId> {
         use Instruction::*;
@@ -349,6 +352,10 @@ impl Function {
             basic_blocks,
             cfg,
         }
+    }
+
+    pub fn instruction(&self, inst_id: InstId) -> &Instruction {
+        &self.basic_blocks[inst_id.0].instructions[inst_id.1]
     }
 }
 

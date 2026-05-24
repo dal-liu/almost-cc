@@ -151,8 +151,8 @@ impl SelectionForest {
             forest.roots.push(root);
         };
 
-        for &id in &ctx.inst_ids {
-            match &func.basic_blocks[ctx.block_id.0].instructions[id] {
+        for &inst_id in &ctx.inst_ids {
+            match func.instruction(inst_id) {
                 Assign { dst, src } => {
                     alloc_tree(OpKind::Assign, &[*src], Some(Value::Variable(*dst)))
                 }
@@ -209,7 +209,7 @@ impl SelectionForest {
     fn merge_trees(
         &mut self,
         func: &Function,
-        ctx: &mut Context,
+        mut ctx: Context,
         liveness: &LivenessResult,
         def_use: &DefUseChain,
     ) {
@@ -217,7 +217,7 @@ impl SelectionForest {
             let num_roots = self.roots.len();
             for i in 0..num_roots.saturating_sub(1) {
                 for j in i + 1..num_roots {
-                    if self.try_merge(func, ctx, liveness, def_use, i, j) {
+                    if self.try_merge(func, &mut ctx, liveness, def_use, i, j) {
                         continue 'outer;
                     }
                 }
@@ -271,32 +271,31 @@ impl SelectionForest {
             return false;
         };
 
-        let block = &func.basic_blocks[ctx.block_id.0];
-        let inst1 = &block.instructions[ctx.inst_ids[i]];
-        let inst2 = &block.instructions[ctx.inst_ids[j]];
+        let inst1 = ctx.inst_ids[i];
+        let inst2 = ctx.inst_ids[j];
 
-        if !liveness.is_dead_at(ctx.block_id, ctx.inst_ids[j], *result)
-            || !def_use.is_only_user(inst1, inst2)
-        {
+        if !is_dead_at(liveness, inst1, *result) || !is_only_user(def_use, inst1, inst2) {
             return false;
         }
 
-        for k in i + 1..j {
-            let mid = &block.instructions[ctx.inst_ids[k]];
+        let start = func.instruction(inst1);
 
-            match inst1 {
+        for k in i + 1..j {
+            let middle = func.instruction(ctx.inst_ids[k]);
+
+            match start {
                 Instruction::Load { .. } => {
-                    if matches!(mid, Instruction::Load { .. } | Instruction::Store { .. }) {
+                    if matches!(middle, Instruction::Load { .. } | Instruction::Store { .. }) {
                         return false;
                     }
                 }
                 _ => {
-                    if mid
+                    if middle
                         .uses()
-                        .any(|use_| inst1.defs().is_some_and(|def| def == use_))
-                        || inst1
+                        .any(|use_| start.defs().is_some_and(|def| def == use_))
+                        || start
                             .uses()
-                            .any(|use_| mid.defs().is_some_and(|def| def == use_))
+                            .any(|use_| middle.defs().is_some_and(|def| def == use_))
                     {
                         return false;
                     }
@@ -352,8 +351,17 @@ pub fn generate_forest(
     def_use: &DefUseChain,
     ctx: &Context,
 ) -> SelectionForest {
-    let mut ctx_clone = ctx.clone();
+    let ctx_clone = ctx.clone();
     let mut forest = SelectionForest::new(func, &ctx_clone);
-    forest.merge_trees(func, &mut ctx_clone, liveness, def_use);
+    forest.merge_trees(func, ctx_clone, liveness, def_use);
     forest
+}
+
+fn is_dead_at(liveness: &LivenessResult, inst_id: InstId, symbol_id: SymbolId) -> bool {
+    !liveness.out[inst_id.0][inst_id.1].test(liveness.interner[&symbol_id])
+}
+
+fn is_only_user(def_use: &DefUseChain, inst_id: InstId, user_id: InstId) -> bool {
+    let users = &def_use.users[&inst_id];
+    users.len() == 1 && users.iter().next().is_some_and(|&id| id == user_id)
 }

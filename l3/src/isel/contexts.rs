@@ -1,18 +1,14 @@
 use l3::*;
 
-type InstId = usize;
-
 #[derive(Debug, Clone)]
 pub struct Context {
-    pub block_id: BlockId,
     pub inst_ids: Vec<InstId>,
     pub terminator: Option<InstId>,
 }
 
 impl Context {
-    fn new(block_id: BlockId) -> Self {
+    fn new() -> Self {
         Self {
-            block_id,
             inst_ids: Vec::new(),
             terminator: None,
         }
@@ -23,28 +19,29 @@ pub fn create_contexts(func: &Function) -> Vec<Context> {
     let mut contexts = Vec::new();
 
     for (i, block) in func.basic_blocks.iter().enumerate() {
-        contexts.push(Context::new(BlockId(i)));
+        contexts.push(Context::new());
 
         for (j, inst) in block.instructions.iter().enumerate() {
             let context = contexts.last_mut().unwrap();
+            let inst_id = InstId(i, j);
 
             match inst {
                 Instruction::Return
                 | Instruction::ReturnValue(_)
                 | Instruction::Branch(_)
                 | Instruction::BranchCondition { .. } => {
-                    context.inst_ids.push(j);
-                    contexts.push(Context::new(BlockId(i)));
+                    context.inst_ids.push(inst_id);
+                    contexts.push(Context::new());
                 }
 
                 Instruction::Label(_)
                 | Instruction::Call { .. }
                 | Instruction::CallResult { .. } => {
-                    context.terminator = Some(j);
-                    contexts.push(Context::new(BlockId(i)));
+                    context.terminator = Some(inst_id);
+                    contexts.push(Context::new());
                 }
 
-                _ => context.inst_ids.push(j),
+                _ => context.inst_ids.push(inst_id),
             }
         }
     }

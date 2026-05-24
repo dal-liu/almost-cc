@@ -1,69 +1,88 @@
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::iter;
 
 use l3::*;
-use utils::{BitVector, DisplayResolved, Interner};
+use utils::{DisplayResolved, Interner};
 
 use crate::analysis::reaching_def::ReachingDefResult;
 
 #[derive(Debug)]
-pub struct DefUseChain<'a> {
-    interner: &'a Interner<Instruction>,
-    users: Vec<BitVector>,
+pub struct DefUseChain {
+    pub users: HashMap<InstId, HashSet<InstId>>,
 }
 
-impl<'a> DefUseChain<'a> {
-    pub fn new(func: &Function, reaching_def: &'a ReachingDefResult) -> Self {
-        let interner = &reaching_def.interner;
-        let num_insts = interner.len();
-        let mut users = vec![BitVector::new(num_insts); num_insts];
+impl DefUseChain {
+    pub fn new(func: &Function, reaching_def: &ReachingDefResult) -> Self {
+        let mut users: HashMap<InstId, HashSet<InstId>> = HashMap::new();
 
         for (i, block) in func.basic_blocks.iter().enumerate() {
             for (j, inst) in block.instructions.iter().enumerate() {
                 for use_ in inst.uses() {
-                    for def_id in &reaching_def.in_[i][j] {
-                        if interner
-                            .resolve(def_id)
-                            .defs()
-                            .is_some_and(|def| def == use_)
-                        {
-                            users[def_id].set(interner[inst]);
+                    for &def_id in reaching_def.in_[i][j]
+                        .iter()
+                        .map(|idx| reaching_def.interner.resolve(idx))
+                    {
+                        if def_id.0 == func.basic_blocks.len() {
+                            if func.params[def_id.1] == use_ {
+                                users.entry(def_id).or_default().insert(InstId(i, j));
+                            }
+                        } else {
+                            if func
+                                .instruction(def_id)
+                                .defs()
+                                .is_some_and(|def| def == use_)
+                            {
+                                users.entry(def_id).or_default().insert(InstId(i, j));
+                            }
                         }
                     }
                 }
             }
         }
 
-        Self { interner, users }
+        Self { users }
     }
 
-    pub fn is_only_user(&self, inst: &Instruction, user: &Instruction) -> bool {
-        let users = &self.users[self.interner[inst]];
-        users.count() == 1
-            && users
-                .iter()
-                .next()
-                .is_some_and(|idx| self.interner.resolve(idx) == user)
+    #[allow(dead_code)]
+    pub fn display<'a>(&'a self, func: &'a Function) -> DefUseChainDisplay<'a> {
+        DefUseChainDisplay {
+            func,
+            def_use: self,
+        }
     }
 }
 
-impl DisplayResolved for DefUseChain<'_> {
+#[derive(Debug)]
+pub struct DefUseChainDisplay<'a> {
+    func: &'a Function,
+    def_use: &'a DefUseChain,
+}
+
+impl<'a> DisplayResolved for DefUseChainDisplay<'a> {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
-        let mut lines: Vec<String> =
-            self.users
-                .iter()
-                .enumerate()
-                .map(|(i, users)| {
-                    let mut line: Vec<String> =
-                        iter::once(self.interner.resolve(i).resolved(interner).to_string())
-                            .chain(users.iter().map(|idx| {
-                                self.interner.resolve(idx).resolved(interner).to_string()
-                            }))
-                            .collect();
-                    line.sort();
-                    format!("{}", line.join(", "))
-                })
+        let mut lines: Vec<String> = self
+            .def_use
+            .users
+            .iter()
+            .map(|(&inst_id, users)| {
+                let mut line: Vec<String> = iter::once(
+                    self.func
+                        .instruction(inst_id)
+                        .resolved(interner)
+                        .to_string(),
+                )
+                .chain(users.iter().map(|&user_id| {
+                    self.func
+                        .instruction(user_id)
+                        .resolved(interner)
+                        .to_string()
+                }))
                 .collect();
+                line.sort();
+                format!("{}", line.join(", "))
+            })
+            .collect();
         lines.sort();
         writeln!(f, "{}", lines.join("\n"))
     }

@@ -8,7 +8,7 @@ pub trait Dataflow {
 
     fn meet(&self, current: &mut BitVector, other: &BitVector);
 
-    fn transfer(&self, input: &BitVector, id: BlockId) -> BitVector;
+    fn transfer(&self, input: &BitVector, block_id: BlockId) -> BitVector;
 
     fn solve(&self, func: &Function) -> (Vec<BitVector>, Vec<BitVector>) {
         let num_blocks = func.basic_blocks.len();

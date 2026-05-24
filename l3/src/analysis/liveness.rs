@@ -5,18 +5,10 @@ use utils::{BitVector, DisplayResolved, Interner};
 
 use crate::analysis::dataflow::{Dataflow, Direction};
 
-type InstId = usize;
-
 #[derive(Debug)]
 pub struct LivenessResult {
     pub interner: Interner<SymbolId>,
     pub out: Vec<Vec<BitVector>>,
-}
-
-impl LivenessResult {
-    pub fn is_dead_at(&self, block_id: BlockId, inst_id: InstId, symbol_id: SymbolId) -> bool {
-        !self.out[block_id.0][inst_id].test(self.interner[&symbol_id])
-    }
 }
 
 impl DisplayResolved for LivenessResult {
@@ -92,10 +84,10 @@ impl Dataflow for LivenessAnalysis {
         current.union(&other);
     }
 
-    fn transfer(&self, input: &BitVector, id: BlockId) -> BitVector {
+    fn transfer(&self, input: &BitVector, block_id: BlockId) -> BitVector {
         let mut output = input.clone();
-        output.difference(&self.block_kill[id.0]);
-        output.union(&self.block_gen[id.0]);
+        output.difference(&self.block_kill[block_id.0]);
+        output.union(&self.block_gen[block_id.0]);
         output
     }
 }
