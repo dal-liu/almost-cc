@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use l2;
 use l3::*;
@@ -104,14 +105,7 @@ macro_rules! pat {
     };
 }
 
-impl SelectionForest {
-    fn translate_node(&self, id: NodeId) -> l2::Value {
-        match self.result(id) {
-            Some(val) => translate_value(val),
-            None => unreachable!("translatable nodes should have values"),
-        }
-    }
-}
+pub const TILES: LazyLock<Vec<Tile>> = LazyLock::new(tiles);
 
 #[derive(Debug, Clone)]
 pub struct Pattern {
@@ -182,6 +176,15 @@ pub struct Cover<'a> {
     pub root: NodeId,
 }
 
+impl SelectionForest {
+    fn translate_node(&self, id: NodeId) -> l2::Value {
+        match self.result(id) {
+            Some(val) => translate_value(val),
+            None => unreachable!("translatable nodes should have values"),
+        }
+    }
+}
+
 pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cover<'a>> {
     fn dfs<'a>(
         forest: &SelectionForest,
@@ -231,7 +234,7 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
         .collect()
 }
 
-pub fn isel_tiles() -> Vec<Tile> {
+fn tiles() -> Vec<Tile> {
     // VAR <- VAL
     let assign = Tile::new(pat!(Assign(pat!(any))), 1, |forest, root| {
         vec![l2::Instruction::Assign {

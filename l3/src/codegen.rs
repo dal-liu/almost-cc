@@ -11,7 +11,7 @@ use crate::analysis::liveness::compute_liveness;
 use crate::analysis::reaching_def::compute_reaching_def;
 use crate::isel::contexts::create_contexts;
 use crate::isel::forest::{NodeId, NodeKind, SelectionForest, generate_forest};
-use crate::isel::tiling::{Cover, cover_forest, isel_tiles};
+use crate::isel::tiling::{Cover, TILES, cover_forest};
 use crate::translate::{translate_symbol_id, translate_value};
 
 const LABEL_OFFSET: usize = 1;
@@ -96,7 +96,6 @@ impl CodeGenerator {
         let liveness = compute_liveness(func);
         let reaching_def = compute_reaching_def(func);
         let def_use = DefUseChain::new(func, &reaching_def);
-        let tiles = isel_tiles();
 
         fn dfs(
             forest: &SelectionForest,
@@ -123,7 +122,7 @@ impl CodeGenerator {
         for ctx in create_contexts(func) {
             let forest = generate_forest(func, &liveness, &def_use, &ctx);
 
-            for cover in cover_forest(&forest, &tiles) {
+            for cover in cover_forest(&forest, &TILES) {
                 dfs(&forest, cover.root, &mut self.stream, &cover, interner)?;
             }
 
