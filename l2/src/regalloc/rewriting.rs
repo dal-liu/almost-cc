@@ -23,7 +23,7 @@ pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) 
         let coloring = color_graph(func, &liveness, interference, &loops, &prev_spilled);
 
         if coloring.spill_nodes.is_empty() {
-            rewrite_program(func, &coloring);
+            rewrite_function(func, &coloring);
             break;
         }
 
@@ -34,7 +34,7 @@ pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) 
     }
 }
 
-fn rewrite_program(func: &mut Function, coloring: &ColoringResult) {
+fn rewrite_function(func: &mut Function, coloring: &ColoringResult) {
     for block in &mut func.basic_blocks {
         for inst in &mut block.instructions {
             let vars: Vec<Value> = inst

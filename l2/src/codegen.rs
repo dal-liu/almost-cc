@@ -3,7 +3,7 @@ use std::io::{self, BufWriter, Write};
 
 use l2::*;
 
-use crate::translation::translate_program;
+use crate::translate::translate_program;
 
 struct CodeGenerator {
     stream: BufWriter<File>,

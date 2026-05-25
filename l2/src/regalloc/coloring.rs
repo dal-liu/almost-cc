@@ -21,7 +21,7 @@ struct ColoringAllocator {
     num_defs_uses: Vec<Vec<u32>>,
     loop_depths: Vec<u32>,
     live_across_calls: BitVector,
-    inst_interner: Interner<Instruction>,
+    inst_interner: Interner<InstId>,
 
     precolored: Vec<ValueId>,
     simplify_worklist: BitVector,
@@ -54,13 +54,20 @@ impl ColoringAllocator {
         let inst_interner = func
             .basic_blocks
             .iter()
-            .flat_map(|block| &block.instructions)
-            .fold(Interner::new(), |mut interner, &inst| {
+            .enumerate()
+            .flat_map(|(i, block)| {
+                block
+                    .instructions
+                    .iter()
+                    .enumerate()
+                    .map(move |(j, inst)| (InstId(i, j), inst))
+            })
+            .fold(Interner::new(), |mut interner, (id, inst)| {
                 match inst {
                     Instruction::Assign { dst, src }
                         if dst.is_gp_variable() && src.is_gp_variable() =>
                     {
-                        interner.intern(inst);
+                        interner.intern(id);
                     }
                     _ => (),
                 }
@@ -89,7 +96,7 @@ impl ColoringAllocator {
                     Instruction::Assign { dst, src }
                         if dst.is_gp_variable() && src.is_gp_variable() =>
                     {
-                        let move_ = inst_interner.get(inst);
+                        let move_ = inst_interner.get(&InstId(i, j));
                         worklist_moves.set(move_);
 
                         for var in [dst, src] {
@@ -158,7 +165,12 @@ impl ColoringAllocator {
         }
     }
 
-    fn allocate(&mut self, val_interner: &Interner<Value>, prev_spilled: &HashSet<Value>) {
+    fn allocate(
+        &mut self,
+        func: &Function,
+        val_interner: &Interner<Value>,
+        prev_spilled: &HashSet<Value>,
+    ) {
         while self.simplify_worklist.any()
             || self.worklist_moves.any()
             || self.freeze_worklist.any()
@@ -167,11 +179,11 @@ impl ColoringAllocator {
             if self.simplify_worklist.any() {
                 self.simplify();
             } else if self.worklist_moves.any() {
-                self.coalesce(val_interner);
+                self.coalesce(func, val_interner);
             } else if self.freeze_worklist.any() {
-                self.freeze(val_interner);
+                self.freeze(func, val_interner);
             } else if self.spill_worklist.any() {
-                self.select_spill(val_interner, prev_spilled);
+                self.select_spill(func, val_interner, prev_spilled);
             }
         }
     }
@@ -291,9 +303,11 @@ impl ColoringAllocator {
         }
     }
 
-    fn coalesce(&mut self, val_interner: &Interner<Value>) {
+    fn coalesce(&mut self, func: &Function, val_interner: &Interner<Value>) {
         if let Some(move_) = self.worklist_moves.iter().next() {
-            if let Instruction::Assign { dst, src } = self.inst_interner.resolve(move_) {
+            let inst_id = *self.inst_interner.resolve(move_);
+
+            if let Some(Instruction::Assign { dst, src }) = func.instruction(inst_id) {
                 let x = self.get_alias(val_interner.get(dst));
                 let y = self.get_alias(val_interner.get(src));
 
@@ -390,15 +404,15 @@ impl ColoringAllocator {
         }
     }
 
-    fn freeze(&mut self, val_interner: &Interner<Value>) {
+    fn freeze(&mut self, func: &Function, val_interner: &Interner<Value>) {
         if let Some(node) = self.freeze_worklist.iter().next() {
             self.freeze_worklist.reset(node);
             self.simplify_worklist.set(node);
-            self.freeze_moves(val_interner, node);
+            self.freeze_moves(func, val_interner, node);
         }
     }
 
-    fn freeze_moves(&mut self, val_interner: &Interner<Value>, u: ValueId) {
+    fn freeze_moves(&mut self, func: &Function, val_interner: &Interner<Value>, u: ValueId) {
         for move_ in self.node_moves(u).iter() {
             if self.active_moves.test(move_) {
                 self.active_moves.reset(move_);
@@ -408,11 +422,12 @@ impl ColoringAllocator {
 
             self.frozen_moves.set(move_);
 
-            let v = match self.inst_interner.resolve(move_) {
-                Instruction::Assign { dst, src } => {
+            let inst_id = *self.inst_interner.resolve(move_);
+            let v = match func.instruction(inst_id) {
+                Some(Instruction::Assign { dst, src }) => {
                     val_interner.get(if val_interner.get(dst) == u { src } else { dst })
                 }
-                _ => unreachable!("not a move"),
+                _ => unreachable!("not a valid move"),
             };
 
             if self.node_moves(v).none() && self.interference.degree(v) < Register::NUM_GP_REGISTERS
@@ -423,7 +438,12 @@ impl ColoringAllocator {
         }
     }
 
-    fn select_spill(&mut self, val_interner: &Interner<Value>, prev_spilled: &HashSet<Value>) {
+    fn select_spill(
+        &mut self,
+        func: &Function,
+        val_interner: &Interner<Value>,
+        prev_spilled: &HashSet<Value>,
+    ) {
         let candidate = self
             .spill_worklist
             .iter()
@@ -438,7 +458,7 @@ impl ColoringAllocator {
         if let Some(node) = candidate {
             self.spill_worklist.reset(node);
             self.simplify_worklist.set(node);
-            self.freeze_moves(val_interner, node);
+            self.freeze_moves(func, val_interner, node);
         }
     }
 
@@ -462,6 +482,6 @@ pub fn color_graph(
 ) -> ColoringResult {
     let mut allocator = ColoringAllocator::new(func, liveness, interference, loops);
     allocator.mk_worklist();
-    allocator.allocate(&liveness.interner, prev_spilled);
+    allocator.allocate(func, &liveness.interner, prev_spilled);
     allocator.assign_colors(&liveness.interner)
 }

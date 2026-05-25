@@ -176,7 +176,7 @@ impl fmt::Display for CompareOp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Instruction {
     Assign {
         dst: Value,
@@ -543,6 +543,9 @@ impl DisplayResolved for Instruction {
     }
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct InstId(pub usize, pub usize);
+
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
     pub instructions: Vec<Instruction>,
@@ -615,6 +618,12 @@ impl Function {
             basic_blocks,
             cfg,
         }
+    }
+
+    pub fn instruction(&self, inst_id: InstId) -> Option<&Instruction> {
+        self.basic_blocks
+            .get(inst_id.0)
+            .and_then(|block| block.instructions.get(inst_id.1))
     }
 }
 

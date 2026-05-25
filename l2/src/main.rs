@@ -3,7 +3,7 @@ mod codegen;
 mod parser;
 mod regalloc;
 mod transform;
-mod translation;
+mod translate;
 
 use clap::Parser;
 
