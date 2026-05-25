@@ -18,6 +18,8 @@ impl DefUseChain {
 
         for (i, block) in func.basic_blocks.iter().enumerate() {
             for (j, inst) in block.instructions.iter().enumerate() {
+                users.insert(InstId(i, j), HashSet::new());
+
                 for use_ in inst.uses() {
                     for &def_id in reaching_def.in_[i][j]
                         .iter()
