@@ -65,20 +65,20 @@ impl<'a> DisplayResolved for DefUseChainDisplay<'a> {
             .def_use
             .users
             .iter()
-            .map(|(&inst_id, users)| {
-                let mut line: Vec<String> = iter::once(
-                    self.func
-                        .instruction(inst_id)
-                        .resolved(interner)
-                        .to_string(),
-                )
-                .chain(users.iter().map(|&user_id| {
-                    self.func
-                        .instruction(user_id)
-                        .resolved(interner)
-                        .to_string()
-                }))
-                .collect();
+            .map(|(&def_id, users)| {
+                let def_str = if def_id.0 == self.func.basic_blocks.len() {
+                    format!("%{}", self.func.params[def_id.1].resolved(interner))
+                } else {
+                    self.func.instruction(def_id).resolved(interner).to_string()
+                };
+                let mut line: Vec<String> = iter::once(def_str)
+                    .chain(users.iter().map(|&user_id| {
+                        self.func
+                            .instruction(user_id)
+                            .resolved(interner)
+                            .to_string()
+                    }))
+                    .collect();
                 line.sort();
                 format!("{}", line.join(", "))
             })

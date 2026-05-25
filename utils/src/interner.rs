@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
-use std::ops::Index;
 
 pub trait DisplayResolved {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result;
@@ -57,12 +56,8 @@ impl<T: Clone + Eq + Hash> Interner<T> {
     pub fn len(&self) -> usize {
         self.vec.len()
     }
-}
 
-impl<T: Eq + Hash> Index<&T> for Interner<T> {
-    type Output = usize;
-
-    fn index(&self, item: &T) -> &Self::Output {
-        &self.map[item]
+    pub fn get(&self, item: &T) -> usize {
+        self.map[item]
     }
 }

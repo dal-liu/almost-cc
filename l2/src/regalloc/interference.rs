@@ -20,7 +20,7 @@ impl InterferenceGraph {
         };
 
         let gp_registers: Vec<NodeId> = Register::gp_registers()
-            .map(|reg| liveness.interner[&Value::Register(reg)])
+            .map(|reg| liveness.interner.get(&Value::Register(reg)))
             .collect();
         for &u in &gp_registers {
             for &v in &gp_registers {
@@ -36,11 +36,11 @@ impl InterferenceGraph {
             for inst in block.instructions.iter().rev() {
                 match inst {
                     Instruction::Assign { src, .. } if src.is_gp_variable() => {
-                        live.reset(liveness.interner[src]);
+                        live.reset(liveness.interner.get(src));
                     }
                     Instruction::Shift { src, .. } if matches!(src, Value::Variable(_)) => {
-                        let rcx = liveness.interner[&Value::Register(Register::RCX)];
-                        let u = liveness.interner[src];
+                        let rcx = liveness.interner.get(&Value::Register(Register::RCX));
+                        let u = liveness.interner.get(src);
                         for &v in &gp_registers {
                             if v != rcx {
                                 graph.add_edge(u, v);
@@ -50,7 +50,8 @@ impl InterferenceGraph {
                     _ => (),
                 }
 
-                let defs: Vec<NodeId> = inst.defs().map(|def| liveness.interner[&def]).collect();
+                let defs: Vec<NodeId> =
+                    inst.defs().map(|def| liveness.interner.get(&def)).collect();
 
                 live.set_from(defs.iter().copied());
                 for &u in &defs {
@@ -62,7 +63,7 @@ impl InterferenceGraph {
                 }
 
                 live.reset_from(defs.iter().copied());
-                live.set_from(inst.uses().map(|use_| liveness.interner[&use_]));
+                live.set_from(inst.uses().map(|use_| liveness.interner.get(&use_)));
             }
         }
 

@@ -358,7 +358,7 @@ pub fn generate_forest(
 }
 
 fn is_dead_at(liveness: &LivenessResult, inst_id: InstId, symbol_id: SymbolId) -> bool {
-    !liveness.out[inst_id.0][inst_id.1].test(liveness.interner[&symbol_id])
+    !liveness.out[inst_id.0][inst_id.1].test(liveness.interner.get(&symbol_id))
 }
 
 fn is_only_user(def_use: &DefUseChain, inst_id: InstId, user_id: InstId) -> bool {

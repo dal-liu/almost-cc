@@ -82,18 +82,18 @@ impl ColoringAllocator {
 
             for (j, inst) in block.instructions.iter().enumerate() {
                 for var in inst.defs().chain(inst.uses()) {
-                    num_defs_uses[liveness.interner[&var]][i] += 1;
+                    num_defs_uses[liveness.interner.get(&var)][i] += 1;
                 }
 
                 match inst {
                     Instruction::Assign { dst, src }
                         if dst.is_gp_variable() && src.is_gp_variable() =>
                     {
-                        let move_ = inst_interner[inst];
+                        let move_ = inst_interner.get(inst);
                         worklist_moves.set(move_);
 
                         for var in [dst, src] {
-                            let node = liveness.interner[var];
+                            let node = liveness.interner.get(var);
                             move_list[node].set(move_);
                         }
                     }
@@ -108,7 +108,7 @@ impl ColoringAllocator {
         }
 
         let precolored: Vec<ValueId> = Register::gp_registers()
-            .map(|reg| liveness.interner[&Value::Register(reg)])
+            .map(|reg| liveness.interner.get(&Value::Register(reg)))
             .collect();
 
         let alias = (0..num_nodes).collect();
@@ -190,7 +190,7 @@ impl ColoringAllocator {
                     .iter()
                     .chain(Register::CALLEE_SAVED.iter())
             }
-            .map(|&reg| val_interner[&Value::Register(reg)])
+            .map(|&reg| val_interner.get(&Value::Register(reg)))
             .collect();
 
             for v in &self.interference.graph[u] {
@@ -294,8 +294,8 @@ impl ColoringAllocator {
     fn coalesce(&mut self, val_interner: &Interner<Value>) {
         if let Some(move_) = self.worklist_moves.iter().next() {
             if let Instruction::Assign { dst, src } = self.inst_interner.resolve(move_) {
-                let x = self.get_alias(val_interner[dst]);
-                let y = self.get_alias(val_interner[src]);
+                let x = self.get_alias(val_interner.get(dst));
+                let y = self.get_alias(val_interner.get(src));
 
                 let (u, v) = if self.precolored.contains(&y) {
                     (y, x)
@@ -410,7 +410,7 @@ impl ColoringAllocator {
 
             let v = match self.inst_interner.resolve(move_) {
                 Instruction::Assign { dst, src } => {
-                    val_interner[if val_interner[dst] == u { src } else { dst }]
+                    val_interner.get(if val_interner.get(dst) == u { src } else { dst })
                 }
                 _ => unreachable!("not a move"),
             };

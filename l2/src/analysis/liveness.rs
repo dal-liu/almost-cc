@@ -65,10 +65,10 @@ pub fn compute_liveness(func: &Function) -> LivenessResult {
     for (i, block) in func.basic_blocks.iter().enumerate() {
         for inst in &block.instructions {
             block_gen[i].set_from(inst.uses().filter_map(|use_| {
-                let j = interner[&use_];
+                let j = interner.get(&use_);
                 (!block_kill[i].test(j)).then_some(j)
             }));
-            block_kill[i].set_from(inst.defs().map(|def| interner[&def]));
+            block_kill[i].set_from(inst.defs().map(|def| interner.get(&def)));
         }
     }
 
@@ -109,8 +109,8 @@ pub fn compute_liveness(func: &Function) -> LivenessResult {
 
     for (i, block) in func.basic_blocks.iter().enumerate() {
         for (j, inst) in block.instructions.iter().enumerate().rev() {
-            inst_gen[i][j].set_from(inst.uses().map(|use_| interner[&use_]));
-            inst_kill[i][j].set_from(inst.defs().map(|def| interner[&def]));
+            inst_gen[i][j].set_from(inst.uses().map(|use_| interner.get(&use_)));
+            inst_kill[i][j].set_from(inst.defs().map(|def| interner.get(&def)));
 
             inst_out[i][j] = if j == block.instructions.len() - 1 {
                 block_out[i].clone()

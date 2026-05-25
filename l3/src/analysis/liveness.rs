@@ -58,10 +58,10 @@ impl LivenessAnalysis {
         for (i, block) in func.basic_blocks.iter().enumerate() {
             for inst in &block.instructions {
                 block_gen[i].set_from(inst.uses().filter_map(|use_| {
-                    let j = interner[&use_];
+                    let j = interner.get(&use_);
                     (!block_kill[i].test(j)).then_some(j)
                 }));
-                block_kill[i].set_from(inst.defs().iter().map(|def| interner[&def]));
+                block_kill[i].set_from(inst.defs().iter().map(|def| interner.get(&def)));
             }
         }
 
@@ -115,8 +115,8 @@ pub fn compute_liveness(func: &Function) -> LivenessResult {
             };
 
             inst_in[i][j] = inst_out[i][j].clone();
-            inst_in[i][j].reset_from(inst.defs().iter().map(|def| liveness.interner[&def]));
-            inst_in[i][j].set_from(inst.uses().map(|use_| liveness.interner[&use_]));
+            inst_in[i][j].reset_from(inst.defs().iter().map(|def| liveness.interner.get(&def)));
+            inst_in[i][j].set_from(inst.uses().map(|use_| liveness.interner.get(&use_)));
         }
     }
 

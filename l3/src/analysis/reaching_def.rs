@@ -76,7 +76,7 @@ impl ReachingDefAnalysis {
                     def_table
                         .entry(def)
                         .or_insert(BitVector::new(num_insts))
-                        .set(interner[&InstId(i, j)]);
+                        .set(interner.get(&InstId(i, j)));
                 }
             }
         }
@@ -91,7 +91,7 @@ impl ReachingDefAnalysis {
                     continue;
                 };
 
-                let k = interner[&InstId(i, j)];
+                let k = interner.get(&InstId(i, j));
                 if !block_kill[i].test(k) {
                     block_gen[i].set(k);
                 }
@@ -177,7 +177,7 @@ pub fn compute_reaching_def(func: &mut Function) -> ReachingDefResult {
 
             inst_out[i][j] = inst_in[i][j].clone();
             if let Some(def) = inst.defs() {
-                let k = reaching_def.interner[&InstId(i, j)];
+                let k = reaching_def.interner.get(&InstId(i, j));
                 inst_out[i][j].reset_from(
                     reaching_def.def_table[&def]
                         .iter()
