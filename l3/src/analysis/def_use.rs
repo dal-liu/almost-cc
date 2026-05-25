@@ -30,6 +30,7 @@ impl DefUseChain {
                         } else {
                             if func
                                 .instruction(def_id)
+                                .expect("inst id should be valid")
                                 .defs()
                                 .is_some_and(|def| def == use_)
                             {
@@ -69,12 +70,17 @@ impl<'a> DisplayResolved for DefUseChainDisplay<'a> {
                 let def_str = if def_id.0 == self.func.basic_blocks.len() {
                     format!("%{}", self.func.params[def_id.1].resolved(interner))
                 } else {
-                    self.func.instruction(def_id).resolved(interner).to_string()
+                    self.func
+                        .instruction(def_id)
+                        .expect("inst id should be valid")
+                        .resolved(interner)
+                        .to_string()
                 };
                 let mut line: Vec<String> = iter::once(def_str)
                     .chain(users.iter().map(|&user_id| {
                         self.func
                             .instruction(user_id)
+                            .expect("inst id should be valid")
                             .resolved(interner)
                             .to_string()
                     }))

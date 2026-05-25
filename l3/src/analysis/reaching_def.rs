@@ -36,7 +36,13 @@ impl DisplayResolved for ReachingDefResultDisplay<'_> {
                     .iter()
                     .map(|idx| {
                         let inst_id = *self.reaching_def.interner.resolve(idx);
-                        format!("{}\n", self.func.instruction(inst_id).resolved(interner))
+                        format!(
+                            "{}\n",
+                            self.func
+                                .instruction(inst_id)
+                                .expect("inst id should be valid")
+                                .resolved(interner)
+                        )
                     })
                     .collect();
                 lines.sort();

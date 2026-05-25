@@ -152,7 +152,7 @@ impl SelectionForest {
         };
 
         for &inst_id in &ctx.inst_ids {
-            match func.instruction(inst_id) {
+            match func.instruction(inst_id).expect("inst id should be valid") {
                 Assign { dst, src } => {
                     alloc_tree(OpKind::Assign, &[*src], Some(Value::Variable(*dst)))
                 }
@@ -278,10 +278,12 @@ impl SelectionForest {
             return false;
         }
 
-        let start = func.instruction(inst1);
+        let start = func.instruction(inst1).expect("inst id should be valid");
 
         for k in i + 1..j {
-            let middle = func.instruction(ctx.inst_ids[k]);
+            let middle = func
+                .instruction(ctx.inst_ids[k])
+                .expect("inst id should be valid");
 
             match start {
                 Instruction::Load { .. } => {

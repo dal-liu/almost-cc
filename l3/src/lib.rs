@@ -354,8 +354,10 @@ impl Function {
         }
     }
 
-    pub fn instruction(&self, inst_id: InstId) -> &Instruction {
-        &self.basic_blocks[inst_id.0].instructions[inst_id.1]
+    pub fn instruction(&self, inst_id: InstId) -> Option<&Instruction> {
+        self.basic_blocks
+            .get(inst_id.0)
+            .and_then(|block| block.instructions.get(inst_id.1))
     }
 }
 

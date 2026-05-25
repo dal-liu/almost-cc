@@ -127,7 +127,7 @@ impl CodeGenerator {
             }
 
             if let Some(term) = ctx.terminator {
-                let inst = func.instruction(term);
+                let inst = func.instruction(term).expect("inst id should be valid");
                 self.emit_instruction(inst, interner, prefix, suffix)?;
             }
         }
