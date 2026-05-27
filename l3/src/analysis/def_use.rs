@@ -3,7 +3,7 @@ use std::fmt;
 use std::iter;
 
 use l3::*;
-use utils::{DisplayResolved, Interner};
+use utils::interner::{DisplayResolved, Interner};
 
 use crate::analysis::reaching_def::ReachingDefResult;
 

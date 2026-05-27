@@ -1,7 +1,8 @@
 use std::fmt;
 
 use l3::*;
-use utils::{BitVector, DisplayResolved, Interner};
+use utils::bitvector::BitVector;
+use utils::interner::{DisplayResolved, Interner};
 
 use crate::analysis::dataflow::{Dataflow, Direction};
 

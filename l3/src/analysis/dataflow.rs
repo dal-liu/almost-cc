@@ -1,5 +1,6 @@
 use l3::*;
-use utils::{BitVector, Worklist};
+use utils::bitvector::BitVector;
+use utils::worklist::Worklist;
 
 pub trait Dataflow {
     const DIRECTION: Direction;

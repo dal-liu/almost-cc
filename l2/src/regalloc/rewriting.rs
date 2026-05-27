@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use l2::*;
-use utils::Interner;
+use utils::interner::Interner;
 
 use crate::analysis::dominators::DominatorTree;
 use crate::analysis::liveness::compute_liveness;

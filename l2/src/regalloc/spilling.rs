@@ -1,7 +1,7 @@
 use std::mem;
 
 use l2::*;
-use utils::Interner;
+use utils::interner::Interner;
 
 pub fn spill(
     func: &mut Function,

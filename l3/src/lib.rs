@@ -3,7 +3,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::iter;
 
-use utils::{DisplayResolved, Interner};
+use utils::interner::{DisplayResolved, Interner};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Callee {

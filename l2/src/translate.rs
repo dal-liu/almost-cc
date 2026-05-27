@@ -1,6 +1,6 @@
 use l1;
 use l2::*;
-use utils::Interner;
+use utils::interner::Interner;
 
 pub fn translate_program(prog: &Program) -> l1::Program {
     l1::Program {

@@ -2,7 +2,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::iter;
 
 use l2::*;
-use utils::{BitVector, Interner};
+use utils::bitvector::BitVector;
+use utils::interner::Interner;
 
 use crate::analysis::liveness::LivenessResult;
 use crate::analysis::loops::LoopForest;

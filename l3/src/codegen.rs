@@ -4,7 +4,7 @@ use std::io::{self, BufWriter, Write};
 
 use l2;
 use l3::*;
-use utils::{DisplayResolved, Interner};
+use utils::interner::{DisplayResolved, Interner};
 
 use crate::analysis::def_use::DefUseChain;
 use crate::analysis::liveness::compute_liveness;

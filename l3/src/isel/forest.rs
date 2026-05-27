@@ -1,7 +1,7 @@
 use std::fmt;
 
 use l3::*;
-use utils::{DisplayResolved, Interner};
+use utils::interner::{DisplayResolved, Interner};
 
 use crate::analysis::def_use::DefUseChain;
 use crate::analysis::liveness::LivenessResult;

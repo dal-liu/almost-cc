@@ -4,7 +4,7 @@ use std::mem;
 use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::prelude::*;
 use l3::*;
-use utils::Interner;
+use utils::interner::Interner;
 
 type L3Extra<'src> = extra::Full<Rich<'src, char>, extra::SimpleState<Interner<String>>, ()>;
 
