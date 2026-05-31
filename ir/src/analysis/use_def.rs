@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use ir::*;
-use utils::{DisplayResolved, Interner};
+use utils::interner::{DisplayResolved, Interner};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operand {

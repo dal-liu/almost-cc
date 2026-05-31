@@ -3,7 +3,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::iter;
 
-use utils::{DisplayResolved, Interner};
+use utils::interner::{DisplayResolved, Interner};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
@@ -531,9 +531,12 @@ impl ControlFlowGraph {
                 } => {
                     let true_succ = id_map[true_label];
                     let false_succ = id_map[false_label];
-                    successors[i].extend([true_succ, false_succ]);
+                    successors[i].push(true_succ);
                     predecessors[true_succ.0].push(BlockId(i));
-                    predecessors[false_succ.0].push(BlockId(i));
+                    if true_succ != false_succ {
+                        successors[i].push(false_succ);
+                        predecessors[false_succ.0].push(BlockId(i));
+                    }
                 }
                 _ => (),
             };

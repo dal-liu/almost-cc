@@ -1,29 +1,33 @@
 use std::iter;
 
 use ir::*;
-use utils::{BitVector, Interner, Worklist};
+use utils::bitvector::BitVector;
+use utils::interner::Interner;
+use utils::worklist::Worklist;
 
 use crate::analysis::dominators::{DominanceFrontier, DominatorTree};
 
-pub fn construct_ssa_form(func: &mut Function, string_interner: &mut Interner<String>) {
-    let dom_tree = DominatorTree::new(func);
-    let dom_front = DominanceFrontier::new(func, &dom_tree);
-    let var_id_interner = func
-        .params
-        .iter()
-        .map(|param| &param.var)
-        .chain(
-            func.basic_blocks
-                .iter()
-                .flat_map(|block| block.instructions.iter().filter_map(|inst| inst.defs())),
-        )
-        .fold(Interner::new(), |mut interner, &def| {
-            interner.intern(def);
-            interner
-        });
+pub fn construct_ssa_form(prog: &mut Program) {
+    for func in &mut prog.functions {
+        let dom_tree = DominatorTree::new(func);
+        let dom_front = DominanceFrontier::new(func, &dom_tree);
+        let interner = func
+            .params
+            .iter()
+            .map(|param| &param.var)
+            .chain(
+                func.basic_blocks
+                    .iter()
+                    .flat_map(|block| block.instructions.iter().filter_map(|inst| inst.defs())),
+            )
+            .fold(Interner::new(), |mut interner, &def| {
+                interner.intern(def);
+                interner
+            });
 
-    place_phi_nodes(func, &dom_front, &var_id_interner);
-    rename_variables(func, string_interner, &dom_tree, &var_id_interner);
+        place_phi_nodes(func, &dom_front, &interner);
+        rename_variables(func, &mut prog.interner, &dom_tree, &interner);
+    }
 }
 
 fn place_phi_nodes(
@@ -35,11 +39,11 @@ fn place_phi_nodes(
     let mut def_blocks = vec![BitVector::new(num_blocks); var_id_interner.len()];
 
     for param in &func.params {
-        def_blocks[var_id_interner[&param.var]].set(0);
+        def_blocks[var_id_interner.get(&param.var)].set(0);
     }
     for (i, block) in func.basic_blocks.iter().enumerate() {
         for def in block.instructions.iter().filter_map(|inst| inst.defs()) {
-            def_blocks[var_id_interner[&def]].set(i);
+            def_blocks[var_id_interner.get(&def)].set(i);
         }
     }
 
@@ -98,7 +102,7 @@ fn rename_variables(
 
     for param in &mut func.params {
         let var = &mut param.var;
-        let v = var_id_interner[var];
+        let v = var_id_interner.get(var);
         let i = counter[v];
         *var = new_var(string_interner, *var, i);
         stack[v].push(i);
@@ -138,14 +142,14 @@ fn dfs(
                 Value::Variable(var) => Some(var),
                 _ => None,
             }) {
-                let v = var_id_interner[use_];
+                let v = var_id_interner.get(use_);
                 let i = *stack[v].last().expect("stack should not be empty");
                 *use_ = new_var(string_interner, *use_, i);
             }
         }
 
         if let Some(def) = inst.defs_mut() {
-            let v = var_id_interner[&def];
+            let v = var_id_interner.get(&def);
             let i = counter[v];
             *def = new_var(string_interner, *def, i);
             stack[v].push(i);
@@ -163,7 +167,7 @@ fn dfs(
                     .find(|val| val.label == label)
                     .expect("phi node should have value from predecessor");
                 if let Value::Variable(var) = &mut val.val {
-                    let v = var_id_interner[var];
+                    let v = var_id_interner.get(var);
                     let i = *stack[v].last().expect("stack should not be empty");
                     *var = new_var(string_interner, *var, i);
                 }

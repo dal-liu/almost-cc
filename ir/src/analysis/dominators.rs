@@ -1,5 +1,6 @@
 use ir::*;
-use utils::{BitVector, Worklist};
+use utils::bitvector::BitVector;
+use utils::worklist::Worklist;
 
 #[derive(Debug)]
 pub struct DominatorTree {

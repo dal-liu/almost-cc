@@ -4,7 +4,7 @@ use std::mem;
 use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::prelude::*;
 use ir::*;
-use utils::Interner;
+use utils::interner::Interner;
 
 type IRExtra<'src> = extra::Full<Rich<'src, char>, extra::SimpleState<Interner<String>>, ()>;
 

@@ -4,13 +4,10 @@ mod ssa;
 mod transform;
 
 use clap::Parser;
-use utils::DisplayResolved;
+use utils::interner::DisplayResolved;
 
 use crate::parser::parse_file;
-use crate::ssa::construct_ssa_form;
-use crate::transform::{
-    algebraic_simplification, constant_folding, constant_propagation, deadcode_elimination,
-};
+use crate::ssa::{construct_ssa_form, split_critical_edges};
 
 #[derive(Parser)]
 struct Cli {
@@ -30,22 +27,8 @@ fn main() {
             print!("{}", &prog);
         }
 
-        for func in &mut prog.functions {
-            construct_ssa_form(func, &mut prog.interner);
-
-            loop {
-                let mut modified = false;
-                modified |= constant_propagation(func);
-                modified |= constant_folding(func);
-                modified |= algebraic_simplification(func);
-                modified |= deadcode_elimination(func);
-
-                if !modified {
-                    break;
-                }
-            }
-
-            println!("{}", func.resolved(&prog.interner));
-        }
+        construct_ssa_form(&mut prog);
+        split_critical_edges(&mut prog);
+        println!("{}", prog);
     }
 }
