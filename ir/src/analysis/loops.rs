@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use l2::*;
+use ir::*;
 use utils::bitvector::BitVector;
 
 use crate::analysis::dominators::DominatorTree;

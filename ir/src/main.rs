@@ -6,6 +6,7 @@ mod transform;
 use clap::Parser;
 use utils::interner::DisplayResolved;
 
+use crate::analysis::{dominators::DominatorTree, loops::LoopForest};
 use crate::parser::parse_file;
 use crate::ssa::{construct_ssa_form, split_critical_edges};
 
@@ -29,6 +30,11 @@ fn main() {
 
         construct_ssa_form(&mut prog);
         split_critical_edges(&mut prog);
-        println!("{}", prog);
+
+        for func in &prog.functions {
+            let dom_tree = DominatorTree::new(func);
+            let loops = LoopForest::new(func, &dom_tree);
+            dbg!(&loops);
+        }
     }
 }

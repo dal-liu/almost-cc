@@ -12,10 +12,16 @@ pub fn split_critical_edges(prog: &mut Program) {
 
             if let Some(idx) = cfg.predecessors[v.0].iter().position(|&pred| pred == u) {
                 cfg.predecessors[v.0][idx] = new_block_id;
+            } else {
+                unreachable!("predecessors of destination block should contain source block")
             }
+
             if let Some(idx) = cfg.successors[u.0].iter().position(|&succ| succ == v) {
                 cfg.successors[u.0][idx] = new_block_id;
+            } else {
+                unreachable!("successors of source block should contain destination block")
             }
+
             cfg.predecessors.push(vec![u]);
             cfg.successors.push(vec![v]);
 
@@ -34,7 +40,12 @@ pub fn split_critical_edges(prog: &mut Program) {
                     false_label
                 };
                 *label_to_replace = new_label;
+            } else {
+                unreachable!(
+                    "critical edge source block should have 2 destinations (BranchCondition)"
+                );
             }
+
             func.basic_blocks.push(BasicBlock {
                 label: new_label,
                 instructions: Vec::new(),
