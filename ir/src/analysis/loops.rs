@@ -2,18 +2,20 @@ use std::collections::HashMap;
 
 use ir::*;
 use utils::bitvector::BitVector;
+use utils::interner::{DisplayResolved, Interner};
 
 use crate::analysis::dominators::DominatorTree;
 
 type LoopId = usize;
 
 #[derive(Debug)]
-pub struct LoopForest {
+pub struct LoopInfo {
     merged_loops: Vec<Loop>,
+    roots: Vec<LoopId>,
     block_map: HashMap<BlockId, LoopId>,
 }
 
-impl LoopForest {
+impl LoopInfo {
     pub fn new(func: &Function, dominators: &DominatorTree) -> Self {
         let num_blocks = func.basic_blocks.len();
 
@@ -57,7 +59,7 @@ impl LoopForest {
                     header: BlockId(i),
                     basic_blocks: blocks.iter().map(BlockId).collect(),
                     depth: 0,
-                    children: Vec::new(),
+                    sub_loops: Vec::new(),
                 })
             })
             .collect();
@@ -74,13 +76,13 @@ impl LoopForest {
             let (left, right) = merged_loops.split_at_mut(i + 1);
             let loop_header = left[i].header;
 
-            let parent = right.iter_mut().find(|other| {
+            let outer_loop = right.iter_mut().find(|other| {
                 dominators.dominates(other.header, loop_header)
                     && other.basic_blocks.contains(&loop_header)
             });
 
-            match parent {
-                Some(parent) => parent.children.push(i),
+            match outer_loop {
+                Some(parent) => parent.sub_loops.push(i),
                 None => roots.push(i),
             }
         }
@@ -89,13 +91,14 @@ impl LoopForest {
         while let Some((node, depth)) = stack.pop() {
             let loop_ = &mut merged_loops[node];
             loop_.depth = depth;
-            for &child in &loop_.children {
-                stack.push((child, depth + 1));
+            for &sub_loop in &loop_.sub_loops {
+                stack.push((sub_loop, depth + 1));
             }
         }
 
         Self {
             merged_loops,
+            roots,
             block_map,
         }
     }
@@ -106,6 +109,42 @@ impl LoopForest {
             None => 0,
         }
     }
+
+    pub fn display<'a>(&'a self, func: &'a Function) -> LoopInfoDisplay<'a> {
+        LoopInfoDisplay { func, loops: self }
+    }
+}
+
+#[derive(Debug)]
+pub struct LoopInfoDisplay<'a> {
+    loops: &'a LoopInfo,
+    func: &'a Function,
+}
+
+impl DisplayResolved for LoopInfoDisplay<'_> {
+    fn fmt_with(
+        &self,
+        f: &mut std::fmt::Formatter,
+        interner: &Interner<String>,
+    ) -> std::fmt::Result {
+        let mut stack = self.loops.roots.clone();
+        while let Some(loop_id) = stack.pop() {
+            let loop_ = &self.loops.merged_loops[loop_id];
+
+            writeln!(
+                f,
+                "{}{}",
+                "  ".repeat(loop_.depth as usize - 1),
+                loop_.display(self.func).resolved(interner)
+            )?;
+
+            for &sub_loop in &loop_.sub_loops {
+                stack.push(sub_loop);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -113,5 +152,38 @@ pub struct Loop {
     header: BlockId,
     basic_blocks: Vec<BlockId>,
     depth: u32,
-    children: Vec<LoopId>,
+    sub_loops: Vec<LoopId>,
+}
+
+impl<'a> Loop {
+    fn display(&'a self, func: &'a Function) -> LoopDisplay<'a> {
+        LoopDisplay { func, loop_: self }
+    }
+}
+
+#[derive(Debug)]
+pub struct LoopDisplay<'a> {
+    func: &'a Function,
+    loop_: &'a Loop,
+}
+
+impl<'a> DisplayResolved for LoopDisplay<'a> {
+    fn fmt_with(
+        &self,
+        f: &mut std::fmt::Formatter,
+        interner: &Interner<String>,
+    ) -> std::fmt::Result {
+        let labels: Vec<String> = self
+            .loop_
+            .basic_blocks
+            .iter()
+            .map(|block_id| {
+                self.func.basic_blocks[block_id.0]
+                    .label
+                    .resolved(interner)
+                    .to_string()
+            })
+            .collect();
+        write!(f, "{}", labels.join(", "))
+    }
 }

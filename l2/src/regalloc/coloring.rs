@@ -6,7 +6,7 @@ use utils::bitvector::BitVector;
 use utils::interner::Interner;
 
 use crate::analysis::liveness::LivenessResult;
-use crate::analysis::loops::LoopForest;
+use crate::analysis::loops::LoopInfo;
 use crate::regalloc::interference::InterferenceGraph;
 
 type ValueId = usize;
@@ -50,7 +50,7 @@ impl ColoringAllocator {
         func: &Function,
         liveness: &LivenessResult,
         interference: InterferenceGraph,
-        loops: &LoopForest,
+        loops: &LoopInfo,
     ) -> Self {
         let inst_interner = func
             .basic_blocks
@@ -478,7 +478,7 @@ pub fn color_graph(
     func: &Function,
     liveness: &LivenessResult,
     interference: InterferenceGraph,
-    loops: &LoopForest,
+    loops: &LoopInfo,
     prev_spilled: &HashSet<Value>,
 ) -> ColoringResult {
     let mut allocator = ColoringAllocator::new(func, liveness, interference, loops);

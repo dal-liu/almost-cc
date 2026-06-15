@@ -8,12 +8,12 @@ use crate::analysis::dominators::DominatorTree;
 type LoopId = usize;
 
 #[derive(Debug)]
-pub struct LoopForest {
+pub struct LoopInfo {
     merged_loops: Vec<Loop>,
     block_map: HashMap<BlockId, LoopId>,
 }
 
-impl LoopForest {
+impl LoopInfo {
     pub fn new(func: &Function, dominators: &DominatorTree) -> Self {
         let num_blocks = func.basic_blocks.len();
 
@@ -57,7 +57,7 @@ impl LoopForest {
                     header: BlockId(i),
                     basic_blocks: blocks.iter().map(BlockId).collect(),
                     depth: 0,
-                    children: Vec::new(),
+                    sub_loops: Vec::new(),
                 })
             })
             .collect();
@@ -74,13 +74,13 @@ impl LoopForest {
             let (left, right) = merged_loops.split_at_mut(i + 1);
             let loop_header = left[i].header;
 
-            let parent = right.iter_mut().find(|other| {
+            let outer_loop = right.iter_mut().find(|other| {
                 dominators.dominates(other.header, loop_header)
                     && other.basic_blocks.contains(&loop_header)
             });
 
-            match parent {
-                Some(parent) => parent.children.push(i),
+            match outer_loop {
+                Some(parent) => parent.sub_loops.push(i),
                 None => roots.push(i),
             }
         }
@@ -89,8 +89,8 @@ impl LoopForest {
         while let Some((node, depth)) = stack.pop() {
             let loop_ = &mut merged_loops[node];
             loop_.depth = depth;
-            for &child in &loop_.children {
-                stack.push((child, depth + 1));
+            for &sub_loop in &loop_.sub_loops {
+                stack.push((sub_loop, depth + 1));
             }
         }
 
@@ -113,5 +113,5 @@ pub struct Loop {
     header: BlockId,
     basic_blocks: Vec<BlockId>,
     depth: u32,
-    children: Vec<LoopId>,
+    sub_loops: Vec<LoopId>,
 }

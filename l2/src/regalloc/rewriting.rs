@@ -5,7 +5,7 @@ use utils::interner::Interner;
 
 use crate::analysis::dominators::DominatorTree;
 use crate::analysis::liveness::compute_liveness;
-use crate::analysis::loops::LoopForest;
+use crate::analysis::loops::LoopInfo;
 use crate::regalloc::coloring::{ColoringResult, color_graph};
 use crate::regalloc::interference::InterferenceGraph;
 use crate::regalloc::spilling::spill;
@@ -19,7 +19,7 @@ pub fn allocate_registers(func: &mut Function, interner: &mut Interner<String>) 
         let liveness = compute_liveness(func);
         let interference = InterferenceGraph::new(func, &liveness);
         let dominators = DominatorTree::new(func);
-        let loops = LoopForest::new(func, &dominators);
+        let loops = LoopInfo::new(func, &dominators);
         let coloring = color_graph(func, &liveness, interference, &loops, &prev_spilled);
 
         if coloring.spill_nodes.is_empty() {
