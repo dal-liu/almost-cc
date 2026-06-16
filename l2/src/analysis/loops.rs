@@ -10,7 +10,7 @@ type LoopId = usize;
 #[derive(Debug)]
 pub struct LoopInfo {
     merged_loops: Vec<Loop>,
-    block_map: HashMap<BlockId, LoopId>,
+    bb_map: HashMap<BlockId, LoopId>,
 }
 
 impl LoopInfo {
@@ -63,12 +63,12 @@ impl LoopInfo {
             .collect();
         merged_loops.sort_by_key(|loop_| loop_.basic_blocks.len());
 
-        let mut roots = Vec::new();
-        let mut block_map = HashMap::new();
+        let mut top_level_loops = Vec::new();
+        let mut bb_map = HashMap::new();
 
         for i in 0..merged_loops.len() {
             for &id in merged_loops.iter().flat_map(|loop_| &loop_.basic_blocks) {
-                block_map.entry(id).or_insert(i);
+                bb_map.entry(id).or_insert(i);
             }
 
             let (left, right) = merged_loops.split_at_mut(i + 1);
@@ -81,11 +81,11 @@ impl LoopInfo {
 
             match outer_loop {
                 Some(parent) => parent.sub_loops.push(i),
-                None => roots.push(i),
+                None => top_level_loops.push(i),
             }
         }
 
-        let mut stack: Vec<(LoopId, u32)> = roots.iter().map(|&root| (root, 1)).collect();
+        let mut stack: Vec<(LoopId, u32)> = top_level_loops.iter().map(|&root| (root, 1)).collect();
         while let Some((node, depth)) = stack.pop() {
             let loop_ = &mut merged_loops[node];
             loop_.depth = depth;
@@ -96,12 +96,12 @@ impl LoopInfo {
 
         Self {
             merged_loops,
-            block_map,
+            bb_map,
         }
     }
 
     pub fn loop_depth(&self, block_id: BlockId) -> u32 {
-        match self.block_map.get(&block_id) {
+        match self.bb_map.get(&block_id) {
             Some(&loop_id) => self.merged_loops[loop_id].depth,
             None => 0,
         }
