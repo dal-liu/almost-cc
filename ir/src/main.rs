@@ -1,6 +1,7 @@
 mod analysis;
 mod parser;
 mod ssa;
+mod tracing;
 mod transform;
 
 use clap::Parser;
@@ -9,6 +10,7 @@ use utils::interner::DisplayResolved;
 use crate::analysis::{dominators::DominatorTree, loops::LoopInfo};
 use crate::parser::parse_file;
 use crate::ssa::{construct_ssa_form, split_critical_edges};
+use crate::tracing::compute_trace_order;
 
 #[derive(Parser)]
 struct Cli {
@@ -34,7 +36,7 @@ fn main() {
         for func in &prog.functions {
             let dom_tree = DominatorTree::new(func);
             let loops = LoopInfo::new(func, &dom_tree);
-            println!("{}", loops.display(func).resolved(&prog.interner));
+            dbg!(compute_trace_order(func, &loops));
         }
     }
 }

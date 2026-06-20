@@ -15,6 +15,14 @@ impl BitVector {
         }
     }
 
+    pub fn with_value(len: usize, value: bool) -> Self {
+        let mut bitvec = Self::new(len);
+        if value {
+            bitvec.set_from(0..len);
+        }
+        bitvec
+    }
+
     pub fn test(&self, idx: usize) -> bool {
         assert!(idx < self.len);
         let word_index = idx / Self::BITWORD_SIZE;
