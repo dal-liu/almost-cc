@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use l3::*;
 
 pub fn mangle_labels(prog: &mut Program) -> (String, u32) {
-    let prefix = longest_label(prog).to_owned();
+    let prefix = format!("{}{}", longest_label(prog), "_global_");
     let mut suffix = 0;
 
     for func in &mut prog.functions {
@@ -17,10 +17,7 @@ pub fn mangle_labels(prog: &mut Program) -> (String, u32) {
                     | Instruction::BranchCondition { label, .. } => {
                         let is_new = !label_to_mangled.contains_key(label);
                         *label = *label_to_mangled.entry(*label).or_insert_with(|| {
-                            SymbolId(
-                                prog.interner
-                                    .intern(format!("{}_global_{}", prefix, suffix)),
-                            )
+                            SymbolId(prog.interner.intern(format!("{}{}", prefix, suffix)))
                         });
                         suffix += is_new as u32;
                     }
