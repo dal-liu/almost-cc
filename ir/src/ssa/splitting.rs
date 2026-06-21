@@ -3,7 +3,7 @@ use utils::interner::Interner;
 
 pub fn split_critical_edges(prog: &mut Program) {
     for func in &mut prog.functions {
-        let prefix = longest_label(func, &prog.interner).to_owned();
+        let prefix = longest_label(func, &prog.interner).to_owned() + "_";
         let critical_edges: Vec<(BlockId, BlockId)> = critical_edges(func).collect();
 
         for (suffix, &(u, v)) in critical_edges.iter().enumerate() {
@@ -25,7 +25,7 @@ pub fn split_critical_edges(prog: &mut Program) {
             cfg.predecessors.push(vec![u]);
             cfg.successors.push(vec![v]);
 
-            let new_label = SymbolId(prog.interner.intern(format!("{}_{}", prefix, suffix)));
+            let new_label = SymbolId(prog.interner.intern(format!("{}{}", prefix, suffix)));
             let old_label = func.basic_blocks[v.0].label;
 
             if let Instruction::BranchCondition {
@@ -41,9 +41,7 @@ pub fn split_critical_edges(prog: &mut Program) {
                 };
                 *label_to_replace = new_label;
             } else {
-                unreachable!(
-                    "critical edge source block should have 2 destinations (BranchCondition)"
-                );
+                unreachable!("critical edge source block should have 2 destinations");
             }
 
             func.basic_blocks.push(BasicBlock {

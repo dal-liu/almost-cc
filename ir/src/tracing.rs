@@ -6,7 +6,7 @@ use crate::analysis::loops::LoopInfo;
 pub fn compute_trace_order(func: &Function, loops: &LoopInfo) -> Vec<BlockId> {
     let num_blocks = func.basic_blocks.len();
     let mut unmarked = BitVector::with_value(num_blocks, true);
-    let mut order = Vec::new();
+    let mut trace_order = Vec::new();
 
     while let Some(i) = unmarked
         .iter()
@@ -16,7 +16,7 @@ pub fn compute_trace_order(func: &Function, loops: &LoopInfo) -> Vec<BlockId> {
 
         loop {
             unmarked.reset(id.0);
-            order.push(id);
+            trace_order.push(id);
 
             let Some(&succ) = func.cfg.successors[id.0]
                 .iter()
@@ -30,5 +30,5 @@ pub fn compute_trace_order(func: &Function, loops: &LoopInfo) -> Vec<BlockId> {
         }
     }
 
-    order
+    trace_order
 }

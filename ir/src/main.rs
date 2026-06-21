@@ -1,16 +1,16 @@
 mod analysis;
+mod codegen;
 mod parser;
 mod ssa;
 mod tracing;
 mod transform;
+mod translate;
 
 use clap::Parser;
-use utils::interner::DisplayResolved;
 
-use crate::analysis::{dominators::DominatorTree, loops::LoopInfo};
+use crate::codegen::generate_code;
 use crate::parser::parse_file;
-use crate::ssa::{construct_ssa_form, split_critical_edges};
-use crate::tracing::compute_trace_order;
+use crate::ssa::{construct_ssa_form, destroy_ssa_form, split_critical_edges};
 
 #[derive(Parser)]
 struct Cli {
@@ -32,11 +32,10 @@ fn main() {
 
         construct_ssa_form(&mut prog);
         split_critical_edges(&mut prog);
+        destroy_ssa_form(&mut prog);
 
-        for func in &prog.functions {
-            let dom_tree = DominatorTree::new(func);
-            let loops = LoopInfo::new(func, &dom_tree);
-            dbg!(compute_trace_order(func, &loops));
+        if cli.generate == 1 {
+            generate_code(&mut prog).unwrap();
         }
     }
 }

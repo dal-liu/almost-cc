@@ -1,8 +1,8 @@
 use l2;
 use l3::*;
 
-pub fn translate_symbol_id(id: SymbolId) -> l2::SymbolId {
-    l2::SymbolId(id.0)
+pub fn translate_symbol_id(symbol_id: SymbolId) -> l2::SymbolId {
+    l2::SymbolId(symbol_id.0)
 }
 
 pub fn translate_value(val: &Value) -> l2::Value {

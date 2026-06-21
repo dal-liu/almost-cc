@@ -1,6 +1,6 @@
 // use ir::*;
 //
-// use crate::xform::pass::Pass;
+// use crate::transform::pass::Pass;
 //
 // pub fn run_optimization_pipeline(func: &mut Function) -> bool {
 //     let passes: Vec<dyn Pass + ?Sized> = vec![];
