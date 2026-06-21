@@ -139,7 +139,6 @@ fn translate_new_array_instruction(
             rhs: l3::Value::Number(1),
         });
         decoded_dims.push(dst);
-        *suffix += 1;
     }
 
     let array_size = new_l3_variable_name(interner, prefix, suffix);
@@ -323,6 +322,16 @@ fn translate_function(func: &Function, interner: &mut Interner<String>) -> l3::F
     )
 }
 
+fn new_l3_variable_name(
+    interner: &mut Interner<String>,
+    prefix: &str,
+    suffix: &mut u32,
+) -> l3::SymbolId {
+    let id = l3::SymbolId(interner.intern(format!("{}{}", prefix, suffix)));
+    *suffix += 1;
+    id
+}
+
 fn longest_variable_name<'a>(func: &Function, interner: &'a Interner<String>) -> &'a str {
     func.basic_blocks
         .iter()
@@ -342,14 +351,4 @@ fn longest_variable_name<'a>(func: &Function, interner: &'a Interner<String>) ->
             _ => longest,
         })
         .map_or("", |longest| longest)
-}
-
-fn new_l3_variable_name(
-    interner: &mut Interner<String>,
-    prefix: &str,
-    suffix: &mut u32,
-) -> l3::SymbolId {
-    let name = l3::SymbolId(interner.intern(format!("{}{}", prefix, suffix)));
-    *suffix += 1;
-    name
 }
