@@ -465,6 +465,24 @@ pub struct Function {
     pub cfg: ControlFlowGraph,
 }
 
+impl Function {
+    pub fn variable_type(&self, var_id: SymbolId) -> Option<&Type> {
+        self.params
+            .iter()
+            .map(|param| (&param.ty, param.var))
+            .chain(
+                self.basic_blocks[0]
+                    .instructions
+                    .iter()
+                    .filter_map(|inst| match inst {
+                        Instruction::Define { ty, var } => Some((ty, *var)),
+                        _ => None,
+                    }),
+            )
+            .find_map(|(ty, var)| if var == var_id { Some(ty) } else { None })
+    }
+}
+
 impl DisplayResolved for Function {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         writeln!(

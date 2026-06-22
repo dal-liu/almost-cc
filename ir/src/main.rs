@@ -30,9 +30,9 @@ fn main() {
             print!("{}", &prog);
         }
 
-        construct_ssa_form(&mut prog);
-        split_critical_edges(&mut prog);
-        destroy_ssa_form(&mut prog);
+        // construct_ssa_form(&mut prog);
+        // split_critical_edges(&mut prog);
+        // destroy_ssa_form(&mut prog);
 
         if cli.generate == 1 {
             generate_code(&mut prog).unwrap();

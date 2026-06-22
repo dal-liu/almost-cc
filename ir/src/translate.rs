@@ -17,14 +17,14 @@ pub fn translate_program(prog: &mut Program) -> l3::Program {
     }
 }
 
-fn translate_symbol_id(symbol_id: SymbolId) -> l3::SymbolId {
+fn translate_symbol_id(symbol_id: &SymbolId) -> l3::SymbolId {
     l3::SymbolId(symbol_id.0)
 }
 
 fn translate_value(val: &Value) -> l3::Value {
     match val {
-        Value::Variable(var) => l3::Value::Variable(translate_symbol_id(*var)),
-        Value::Function(callee) => l3::Value::Function(translate_symbol_id(*callee)),
+        Value::Variable(var) => l3::Value::Variable(translate_symbol_id(var)),
+        Value::Function(callee) => l3::Value::Function(translate_symbol_id(callee)),
         Value::Number(num) => l3::Value::Number(*num),
     }
 }
@@ -40,16 +40,16 @@ fn translate_callee(callee: &Callee) -> l3::Callee {
 }
 
 fn translate_binary_instruction(
-    dst: SymbolId,
+    dst: &SymbolId,
     lhs: &Value,
     op: &BinaryOp,
     rhs: &Value,
-) -> l3::Instruction {
+) -> Vec<l3::Instruction> {
     let dst = translate_symbol_id(dst);
     let lhs = translate_value(lhs);
     let rhs = translate_value(rhs);
 
-    match op {
+    let l3_instruction = match op {
         BinaryOp::Add => l3::Instruction::Binary {
             dst,
             lhs,
@@ -117,11 +117,133 @@ fn translate_binary_instruction(
             cmp: l3::CompareOp::Gt,
             rhs,
         },
+    };
+
+    vec![l3_instruction]
+}
+
+fn translate_index_instruction(
+    func: &Function,
+    val: &Value,
+    idxs: &[Value],
+    interner: &mut Interner<String>,
+    prefix: &str,
+    suffix: &mut u32,
+) -> (Vec<l3::Instruction>, l3::SymbolId) {
+    let Value::Variable(var) = val else {
+        unreachable!("container value should be a variable")
+    };
+    let offset = new_l3_variable_name(interner, prefix, suffix);
+    let mut l3_instructions = Vec::new();
+
+    match func.variable_type(*var) {
+        Some(Type::Array(ndims)) if idxs.len() == *ndims => {
+            let ndims = *ndims as i64;
+
+            let dims: Vec<l3::SymbolId> = (1..ndims)
+                .map(|i| {
+                    let address = new_l3_variable_name(interner, prefix, suffix);
+                    let dim = new_l3_variable_name(interner, prefix, suffix);
+                    l3_instructions.extend([
+                        l3::Instruction::Binary {
+                            dst: address,
+                            lhs: translate_value(val),
+                            op: l3::BinaryOp::Add,
+                            rhs: l3::Value::Number((i + 1) * 8),
+                        },
+                        l3::Instruction::Load {
+                            dst: dim,
+                            src: address,
+                        },
+                        l3::Instruction::Binary {
+                            dst: dim,
+                            lhs: l3::Value::Variable(dim),
+                            op: l3::BinaryOp::Shr,
+                            rhs: l3::Value::Number(1),
+                        },
+                    ]);
+                    dim
+                })
+                .collect();
+
+            l3_instructions.push(l3::Instruction::Assign {
+                dst: offset,
+                src: translate_value(&idxs[idxs.len() - 1]),
+            });
+
+            for i in 0..idxs.len() - 1 {
+                let linearized_idx = new_l3_variable_name(interner, prefix, suffix);
+
+                l3_instructions.push(l3::Instruction::Assign {
+                    dst: linearized_idx,
+                    src: translate_value(&idxs[i]),
+                });
+
+                for j in i..idxs.len() - 1 {
+                    l3_instructions.push(l3::Instruction::Binary {
+                        dst: linearized_idx,
+                        lhs: l3::Value::Variable(linearized_idx),
+                        op: l3::BinaryOp::Mul,
+                        rhs: l3::Value::Variable(dims[j]),
+                    });
+                }
+
+                l3_instructions.push(l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: l3::Value::Variable(offset),
+                    op: l3::BinaryOp::Add,
+                    rhs: l3::Value::Variable(linearized_idx),
+                });
+            }
+
+            l3_instructions.extend([
+                l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: l3::Value::Variable(offset),
+                    op: l3::BinaryOp::Mul,
+                    rhs: l3::Value::Number(8),
+                },
+                l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: l3::Value::Variable(offset),
+                    op: l3::BinaryOp::Add,
+                    rhs: l3::Value::Number(8 + ndims * 8),
+                },
+            ]);
+        }
+
+        Some(Type::Tuple) if idxs.len() == 1 => {
+            l3_instructions.extend([
+                l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: translate_value(&idxs[0]),
+                    op: l3::BinaryOp::Mul,
+                    rhs: l3::Value::Number(8),
+                },
+                l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: l3::Value::Variable(offset),
+                    op: l3::BinaryOp::Add,
+                    rhs: l3::Value::Number(8),
+                },
+            ]);
+        }
+
+        _ => panic!("container type should be array of correct ndims or tuple"),
     }
+
+    l3_instructions.push(l3::Instruction::Binary {
+        dst: offset,
+        lhs: l3::Value::Variable(offset),
+        op: l3::BinaryOp::Add,
+        rhs: translate_value(val),
+    });
+
+    (l3_instructions, offset)
 }
 
 fn translate_new_array_instruction(
-    dst: SymbolId,
+    dst: &SymbolId,
     dims: &[Value],
     interner: &mut Interner<String>,
     prefix: &str,
@@ -202,6 +324,7 @@ fn translate_new_array_instruction(
 }
 
 fn translate_instruction(
+    func: &Function,
     inst: &Instruction,
     interner: &mut Interner<String>,
     prefix: &str,
@@ -211,21 +334,86 @@ fn translate_instruction(
         Instruction::Define { .. } => vec![],
 
         Instruction::Assign { dst, src } => vec![l3::Instruction::Assign {
-            dst: translate_symbol_id(*dst),
+            dst: translate_symbol_id(dst),
             src: translate_value(src),
         }],
 
         Instruction::Binary { dst, lhs, op, rhs } => {
-            vec![translate_binary_instruction(*dst, lhs, op, rhs)]
+            translate_binary_instruction(dst, lhs, op, rhs)
         }
 
-        Instruction::Extract { dst, src, idxs } => todo!(),
+        Instruction::Extract { dst, src, idxs } => {
+            let (mut l3_instructions, offset) =
+                translate_index_instruction(func, src, idxs, interner, prefix, suffix);
+            l3_instructions.push(l3::Instruction::Load {
+                dst: translate_symbol_id(dst),
+                src: offset,
+            });
+            l3_instructions
+        }
 
-        Instruction::Insert { dst, idxs, src } => todo!(),
+        Instruction::Insert { dst, idxs, src } => {
+            let (mut l3_instructions, offset) =
+                translate_index_instruction(func, dst, idxs, interner, prefix, suffix);
+            l3_instructions.push(l3::Instruction::Store {
+                dst: offset,
+                src: translate_value(src),
+            });
+            l3_instructions
+        }
 
-        Instruction::ArrayLength { dst, src, dim } => todo!(),
+        Instruction::ArrayLength { dst, src, dim } => {
+            let offset = new_l3_variable_name(interner, prefix, suffix);
+            vec![
+                l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: translate_value(dim),
+                    op: l3::BinaryOp::Mul,
+                    rhs: l3::Value::Number(8),
+                },
+                l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: l3::Value::Variable(offset),
+                    op: l3::BinaryOp::Add,
+                    rhs: l3::Value::Number(8),
+                },
+                l3::Instruction::Binary {
+                    dst: offset,
+                    lhs: l3::Value::Variable(offset),
+                    op: l3::BinaryOp::Add,
+                    rhs: translate_value(src),
+                },
+                l3::Instruction::Load {
+                    dst: translate_symbol_id(dst),
+                    src: offset,
+                },
+            ]
+        }
 
-        Instruction::TupleLength { dst, src } => todo!(),
+        Instruction::TupleLength { dst, src } => {
+            let dst = translate_symbol_id(dst);
+            let Value::Variable(src) = src else {
+                unreachable!("tuple length src should be a variable");
+            };
+            vec![
+                l3::Instruction::Load {
+                    dst,
+                    src: translate_symbol_id(src),
+                },
+                l3::Instruction::Binary {
+                    dst,
+                    lhs: l3::Value::Variable(dst),
+                    op: l3::BinaryOp::Shl,
+                    rhs: l3::Value::Number(1),
+                },
+                l3::Instruction::Binary {
+                    dst,
+                    lhs: l3::Value::Variable(dst),
+                    op: l3::BinaryOp::Add,
+                    rhs: l3::Value::Number(1),
+                },
+            ]
+        }
 
         Instruction::Call { callee, args } => vec![l3::Instruction::Call {
             callee: translate_callee(callee),
@@ -233,19 +421,19 @@ fn translate_instruction(
         }],
 
         Instruction::CallResult { dst, callee, args } => vec![l3::Instruction::CallResult {
-            dst: translate_symbol_id(*dst),
+            dst: translate_symbol_id(dst),
             callee: translate_callee(callee),
             args: args.iter().map(|arg| translate_value(arg)).collect(),
         }],
 
         Instruction::NewArray { dst, dims } => {
-            translate_new_array_instruction(*dst, dims, interner, prefix, suffix)
+            translate_new_array_instruction(dst, dims, interner, prefix, suffix)
         }
 
         Instruction::NewTuple { dst, len } => vec![l3::Instruction::CallResult {
-            dst: translate_symbol_id(*dst),
+            dst: translate_symbol_id(dst),
             callee: l3::Callee::Allocate,
-            args: vec![translate_value(len)],
+            args: vec![translate_value(len), l3::Value::Number(1)],
         }],
 
         _ => unreachable!("instruction to translate should not be terminator or phi"),
@@ -265,61 +453,89 @@ fn translate_function(func: &Function, interner: &mut Interner<String>) -> l3::F
         let block_id = trace_order[i];
 
         l3_instructions.push(l3::Instruction::Label(translate_symbol_id(
-            func.basic_blocks[block_id.0].label,
+            &func.basic_blocks[block_id.0].label,
         )));
 
         l3_instructions.extend(
             func.basic_blocks[block_id.0]
                 .instructions
                 .iter()
-                .flat_map(|inst| translate_instruction(inst, interner, &prefix, &mut suffix)),
+                .flat_map(|inst| translate_instruction(func, inst, interner, &prefix, &mut suffix)),
         );
 
-        if i < trace_order.len() - 1 {
-            let next = &func.basic_blocks[trace_order[i + 1].0];
-
-            match &func.basic_blocks[block_id.0].terminator {
-                Instruction::Branch(label) if *label != next.label => {
-                    l3_instructions.push(l3::Instruction::Branch(translate_symbol_id(*label)));
-                }
-                Instruction::BranchCondition {
-                    cond,
-                    true_label,
-                    false_label,
-                } => {
-                    let cond = translate_value(cond);
-
-                    match (true_label == &next.label, false_label == &next.label) {
-                        (true, _) => l3_instructions.push(l3::Instruction::BranchCondition {
-                            cond,
-                            label: translate_symbol_id(*false_label),
-                        }),
-                        (_, true) => l3_instructions.push(l3::Instruction::BranchCondition {
-                            cond,
-                            label: translate_symbol_id(*true_label),
-                        }),
-                        (false, false) => l3_instructions.extend([
-                            l3::Instruction::BranchCondition {
-                                cond,
-                                label: translate_symbol_id(*true_label),
-                            },
-                            l3::Instruction::Branch(translate_symbol_id(*false_label)),
-                        ]),
+        match &func.basic_blocks[block_id.0].terminator {
+            Instruction::Branch(label) => {
+                if i < trace_order.len() - 1 {
+                    if label == &func.basic_blocks[trace_order[i + 1].0].label {
+                        continue;
                     }
                 }
-                _ => (),
+                l3_instructions.push(l3::Instruction::Branch(translate_symbol_id(label)));
             }
+
+            Instruction::BranchCondition {
+                cond,
+                true_label,
+                false_label,
+            } => {
+                l3_instructions.push(l3::Instruction::BranchCondition {
+                    cond: translate_value(cond),
+                    label: translate_symbol_id(true_label),
+                });
+
+                if i < trace_order.len() - 1
+                    && false_label == &func.basic_blocks[trace_order[i + 1].0].label
+                {
+                    continue;
+                }
+
+                l3_instructions.push(l3::Instruction::Branch(translate_symbol_id(false_label)));
+            }
+
+            Instruction::Return => l3_instructions.push(l3::Instruction::Return),
+
+            Instruction::ReturnValue(val) => {
+                l3_instructions.push(l3::Instruction::ReturnValue(translate_value(val)))
+            }
+
+            _ => unreachable!("terminator should be branch or return"),
         }
     }
 
     l3::Function::new(
-        translate_symbol_id(func.name),
+        translate_symbol_id(&func.name),
         func.params
             .iter()
-            .map(|param| translate_symbol_id(param.var))
+            .map(|param| translate_symbol_id(&param.var))
             .collect(),
         l3_instructions,
     )
+}
+
+fn longest_variable_name<'a>(func: &Function, interner: &'a Interner<String>) -> &'a str {
+    func.params
+        .iter()
+        .map(|param| &param.var)
+        .chain(
+            func.basic_blocks
+                .iter()
+                .flat_map(|block| &block.instructions)
+                .flat_map(|inst| {
+                    inst.uses()
+                        .filter_map(|use_| match use_ {
+                            Value::Variable(var) => Some(var),
+                            _ => None,
+                        })
+                        .chain(inst.defs())
+                }),
+        )
+        .map(|var| interner.resolve(var.0))
+        .fold(None, |longest, name| match longest {
+            None => Some(name),
+            Some(longest) if name.len() > longest.len() => Some(name),
+            _ => longest,
+        })
+        .map_or("", |longest| longest)
 }
 
 fn new_l3_variable_name(
@@ -330,25 +546,4 @@ fn new_l3_variable_name(
     let id = l3::SymbolId(interner.intern(format!("{}{}", prefix, suffix)));
     *suffix += 1;
     id
-}
-
-fn longest_variable_name<'a>(func: &Function, interner: &'a Interner<String>) -> &'a str {
-    func.basic_blocks
-        .iter()
-        .flat_map(|block| &block.instructions)
-        .flat_map(|inst| {
-            inst.uses()
-                .filter_map(|use_| match use_ {
-                    Value::Variable(var) => Some(var),
-                    _ => None,
-                })
-                .chain(inst.defs())
-        })
-        .map(|var| interner.resolve(var.0))
-        .fold(None, |longest, name| match longest {
-            None => Some(name),
-            Some(longest) if name.len() > longest.len() => Some(name),
-            _ => longest,
-        })
-        .map_or("", |longest| longest)
 }
