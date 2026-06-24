@@ -10,17 +10,17 @@ pub fn split_critical_edges(prog: &mut Program) {
             let cfg = &mut func.cfg;
             let new_block_id = BlockId(func.basic_blocks.len());
 
-            if let Some(idx) = cfg.predecessors[v.0].iter().position(|&pred| pred == u) {
-                cfg.predecessors[v.0][idx] = new_block_id;
-            } else {
-                unreachable!("predecessors of destination block should contain source block")
-            }
+            let pred_idx = cfg.predecessors[v.0]
+                .iter()
+                .position(|&pred| pred == u)
+                .expect("predecessors of destination block should contain source block");
+            cfg.predecessors[v.0][pred_idx] = new_block_id;
 
-            if let Some(idx) = cfg.successors[u.0].iter().position(|&succ| succ == v) {
-                cfg.successors[u.0][idx] = new_block_id;
-            } else {
-                unreachable!("successors of source block should contain destination block")
-            }
+            let succ_idx = cfg.successors[u.0]
+                .iter()
+                .position(|&succ| succ == v)
+                .expect("successors of source block should contain destination block");
+            cfg.successors[u.0][succ_idx] = new_block_id;
 
             cfg.predecessors.push(vec![u]);
             cfg.successors.push(vec![v]);

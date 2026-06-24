@@ -213,7 +213,9 @@ impl Instruction {
 
             Extract { src, idxs, .. } => Box::new(iter::once(src).chain(idxs)),
 
-            Insert { idxs, src, .. } => Box::new(idxs.iter().chain(iter::once(src))),
+            Insert { dst, idxs, src } => {
+                Box::new(iter::once(dst).chain(idxs.iter()).chain(iter::once(src)))
+            }
 
             ArrayLength { src, dim, .. } => Box::new([src, dim].into_iter()),
 
@@ -275,7 +277,11 @@ impl Instruction {
 
             Extract { src, idxs, .. } => Box::new(iter::once(src).chain(idxs)),
 
-            Insert { idxs, src, .. } => Box::new(idxs.iter_mut().chain(iter::once(src))),
+            Insert { dst, idxs, src } => Box::new(
+                iter::once(dst)
+                    .chain(idxs.iter_mut())
+                    .chain(iter::once(src)),
+            ),
 
             ArrayLength { src, dim, .. } => Box::new([src, dim].into_iter()),
 
@@ -463,23 +469,26 @@ pub struct Function {
     pub params: Vec<Parameter>,
     pub basic_blocks: Vec<BasicBlock>,
     pub cfg: ControlFlowGraph,
+    pub symtab: SymbolTable,
 }
 
 impl Function {
-    pub fn variable_type(&self, var_id: SymbolId) -> Option<&Type> {
-        self.params
-            .iter()
-            .map(|param| (&param.ty, param.var))
-            .chain(
-                self.basic_blocks[0]
-                    .instructions
-                    .iter()
-                    .filter_map(|inst| match inst {
-                        Instruction::Define { ty, var } => Some((ty, *var)),
-                        _ => None,
-                    }),
-            )
-            .find_map(|(ty, var)| if var == var_id { Some(ty) } else { None })
+    pub fn new(
+        ty: Type,
+        name: SymbolId,
+        params: Vec<Parameter>,
+        basic_blocks: Vec<BasicBlock>,
+    ) -> Self {
+        let cfg = ControlFlowGraph::new(&basic_blocks);
+        let symtab = SymbolTable::new(&params, &basic_blocks);
+        Self {
+            ty,
+            name,
+            params,
+            basic_blocks,
+            cfg,
+            symtab,
+        }
     }
 }
 
@@ -564,6 +573,30 @@ impl ControlFlowGraph {
             predecessors,
             successors,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SymbolTable {
+    pub type_map: HashMap<SymbolId, Type>,
+}
+
+impl SymbolTable {
+    pub fn new(params: &[Parameter], basic_blocks: &[BasicBlock]) -> Self {
+        let type_map = params
+            .iter()
+            .map(|param| (param.var, param.ty))
+            .chain(
+                basic_blocks
+                    .iter()
+                    .flat_map(|block| &block.instructions)
+                    .filter_map(|inst| match inst {
+                        Instruction::Define { ty, var } => Some((*var, *ty)),
+                        _ => None,
+                    }),
+            )
+            .collect();
+        Self { type_map }
     }
 }
 

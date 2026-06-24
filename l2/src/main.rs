@@ -6,22 +6,12 @@ mod transform;
 mod translate;
 
 use clap::Parser;
+use utils::cli::Cli;
 
 use crate::codegen::generate_code;
 use crate::parser::parse_file;
 use crate::regalloc::allocate_registers;
 use crate::transform::run_peephole_passes;
-
-#[derive(Parser)]
-struct Cli {
-    #[arg(short, default_value_t = false)]
-    verbose: bool,
-
-    #[arg(short, default_value_t = 1)]
-    generate: u8,
-
-    source: String,
-}
 
 fn main() {
     let cli = Cli::parse();

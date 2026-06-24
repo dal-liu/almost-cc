@@ -136,7 +136,7 @@ fn translate_index_instruction(
     let offset = new_l3_variable_name(interner, prefix, suffix);
     let mut l3_instructions = Vec::new();
 
-    match func.variable_type(*var) {
+    match func.symtab.type_map.get(var) {
         Some(Type::Array(ndims)) if idxs.len() == *ndims => {
             let ndims = *ndims as i64;
 
@@ -229,7 +229,7 @@ fn translate_index_instruction(
             ]);
         }
 
-        _ => panic!("container type should be array of correct ndims or tuple"),
+        _ => panic!("container type should be array or tuple of correct ndims/idxs"),
     }
 
     l3_instructions.push(l3::Instruction::Binary {

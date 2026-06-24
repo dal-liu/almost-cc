@@ -104,7 +104,7 @@ fn rename_variables(
         let var = &mut param.var;
         let v = var_id_interner.get(var);
         let i = counter[v];
-        *var = new_var(string_interner, *var, i);
+        *var = new_var(string_interner, &mut func.symtab, *var, i);
         stack[v].push(i);
         counter[v] += 1;
     }
@@ -144,14 +144,14 @@ fn dfs(
             }) {
                 let v = var_id_interner.get(use_);
                 let i = *stack[v].last().expect("stack should not be empty");
-                *use_ = new_var(string_interner, *use_, i);
+                *use_ = new_var(string_interner, &mut func.symtab, *use_, i);
             }
         }
 
         if let Some(def) = inst.defs_mut() {
             let v = var_id_interner.get(&def);
             let i = counter[v];
-            *def = new_var(string_interner, *def, i);
+            *def = new_var(string_interner, &mut func.symtab, *def, i);
             stack[v].push(i);
             counter[v] += 1;
             old_lhs.push(v);
@@ -169,7 +169,7 @@ fn dfs(
                 if let Value::Variable(var) = &mut val.val {
                     let v = var_id_interner.get(var);
                     let i = *stack[v].last().expect("stack should not be empty");
-                    *var = new_var(string_interner, *var, i);
+                    *var = new_var(string_interner, &mut func.symtab, *var, i);
                 }
             }
         }
@@ -192,6 +192,18 @@ fn dfs(
     }
 }
 
-fn new_var(string_interner: &mut Interner<String>, old_var: SymbolId, i: u32) -> SymbolId {
-    SymbolId(string_interner.intern(format!("{}_{}", string_interner.resolve(old_var.0), i)))
+fn new_var(
+    string_interner: &mut Interner<String>,
+    symtab: &mut SymbolTable,
+    old_var: SymbolId,
+    i: u32,
+) -> SymbolId {
+    let new_var =
+        SymbolId(string_interner.intern(format!("{}_{}", string_interner.resolve(old_var.0), i)));
+    let type_ = symtab
+        .type_map
+        .get(&old_var)
+        .expect("variable should have a type");
+    symtab.type_map.insert(new_var, *type_);
+    new_var
 }

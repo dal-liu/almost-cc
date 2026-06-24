@@ -6,21 +6,11 @@ mod parser;
 mod translate;
 
 use clap::Parser;
+use utils::cli::Cli;
 
 use crate::codegen::generate_code;
 use crate::mangling::mangle_labels;
 use crate::parser::parse_file;
-
-#[derive(Parser)]
-struct Cli {
-    #[arg(short, default_value_t = false)]
-    verbose: bool,
-
-    #[arg(short, default_value_t = 1)]
-    generate: u8,
-
-    source: String,
-}
 
 fn main() {
     let cli = Cli::parse();

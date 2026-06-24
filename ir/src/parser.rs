@@ -377,15 +377,12 @@ fn function<'src>() -> impl Parser<'src, &'src str, Function, IRExtra<'src>> {
         )
         .then_ignore(just('}').padded_by(comment().repeated()).padded())
         .map_with(|(((ty, name), params), basic_blocks), e| {
-            let name = SymbolId(e.state().intern(name.to_owned()));
-            let cfg = ControlFlowGraph::new(&basic_blocks);
-            Function {
+            Function::new(
                 ty,
-                name,
+                SymbolId(e.state().intern(name.to_owned())),
                 params,
                 basic_blocks,
-                cfg,
-            }
+            )
         })
         .padded_by(comment().repeated())
         .padded()
