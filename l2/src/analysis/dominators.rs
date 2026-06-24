@@ -36,8 +36,8 @@ impl DominatorTree {
             }
         }
 
-        for i in 0..num_blocks {
-            sdom[i].reset(i);
+        for (i, doms) in sdom.iter_mut().enumerate() {
+            doms.reset(i);
         }
 
         let idom: Vec<Option<BlockId>> = sdom

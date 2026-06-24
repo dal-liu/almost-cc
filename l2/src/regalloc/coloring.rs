@@ -122,7 +122,7 @@ impl ColoringAllocator {
         let alias = (0..num_nodes).collect();
 
         let color = (0..num_nodes)
-            .filter_map(|n| precolored.contains(&n).then_some(n))
+            .filter(|n| precolored.contains(n))
             .map(|n| (n, n))
             .collect();
 
@@ -369,7 +369,7 @@ impl ColoringAllocator {
                 k += 1;
             }
         }
-        return k < Register::NUM_GP_REGISTERS;
+        k < Register::NUM_GP_REGISTERS
     }
 
     fn get_alias(&self, node: ValueId) -> ValueId {

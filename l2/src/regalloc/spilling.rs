@@ -30,14 +30,12 @@ pub fn spill(
                 None
             };
 
-            if spill_use {
-                if let Some(new_var) = spill_var {
-                    block.instructions.push(Instruction::Load {
-                        dst: Value::Variable(new_var),
-                        src: Value::Register(Register::RSP),
-                        offset,
-                    });
-                }
+            if spill_use && let Some(new_var) = spill_var {
+                block.instructions.push(Instruction::Load {
+                    dst: Value::Variable(new_var),
+                    src: Value::Register(Register::RSP),
+                    offset,
+                });
             }
 
             if spill_use || spill_def {
@@ -50,14 +48,12 @@ pub fn spill(
                 block.instructions.push(inst);
             }
 
-            if spill_def {
-                if let Some(new_var) = spill_var {
-                    block.instructions.push(Instruction::Store {
-                        dst: Value::Register(Register::RSP),
-                        offset,
-                        src: Value::Variable(new_var),
-                    });
-                }
+            if spill_def && let Some(new_var) = spill_var {
+                block.instructions.push(Instruction::Store {
+                    dst: Value::Register(Register::RSP),
+                    offset,
+                    src: Value::Variable(new_var),
+                });
             }
         }
     }

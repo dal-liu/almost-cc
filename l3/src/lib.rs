@@ -339,7 +339,7 @@ impl Function {
 
         if basic_blocks
             .last()
-            .map_or(false, |block| block.instructions.is_empty())
+            .is_some_and(|block| block.instructions.is_empty())
         {
             basic_blocks.pop();
         }

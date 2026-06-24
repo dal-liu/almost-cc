@@ -28,6 +28,6 @@ impl CodeGenerator {
 
 pub fn generate_code(prog: &Program) -> io::Result<()> {
     let mut code_generator = CodeGenerator::new()?;
-    code_generator.emit_program(&prog)?;
+    code_generator.emit_program(prog)?;
     code_generator.finish()
 }

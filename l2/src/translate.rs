@@ -1,4 +1,3 @@
-use l1;
 use l2::*;
 use utils::interner::Interner;
 

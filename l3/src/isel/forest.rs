@@ -125,7 +125,7 @@ impl SelectionForest {
 
         let mut alloc_tree = |kind: OpKind, children: &[Value], result: Option<Value>| {
             let children: Vec<NodeId> = children
-                .into_iter()
+                .iter()
                 .copied()
                 .map(|val| {
                     forest.alloc(SFNode {

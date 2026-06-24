@@ -88,7 +88,7 @@ impl<'a> DisplayResolved for DefUseChainDisplay<'a> {
                     }))
                     .collect();
                 line.sort();
-                format!("{}", line.join(", "))
+                line.join(", ")
             })
             .collect();
         lines.sort();

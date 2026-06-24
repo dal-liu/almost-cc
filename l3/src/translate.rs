@@ -1,4 +1,3 @@
-use l2;
 use l3::*;
 
 pub fn translate_symbol_id(symbol_id: SymbolId) -> l2::SymbolId {

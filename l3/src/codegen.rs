@@ -2,7 +2,6 @@ use std::cmp;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 
-use l2;
 use l3::*;
 use utils::interner::{DisplayResolved, Interner};
 
@@ -69,13 +68,13 @@ impl CodeGenerator {
             num_params
         )?;
 
-        for i in 0..cmp::min(num_params, num_arg_registers) {
+        for (&param, &reg) in func.params.iter().zip(ARG_REGISTERS) {
             writeln!(
                 self.stream,
                 "    {}",
                 l2::Instruction::Assign {
-                    dst: l2::Value::Variable(translate_symbol_id(func.params[i])),
-                    src: l2::Value::Register(ARG_REGISTERS[i])
+                    dst: l2::Value::Variable(translate_symbol_id(param)),
+                    src: l2::Value::Register(reg)
                 }
                 .resolved(interner)
             )?;
@@ -119,10 +118,12 @@ impl CodeGenerator {
             Ok(())
         }
 
+        let tiles = &TILES;
+
         for ctx in create_contexts(func) {
             let forest = generate_forest(func, &liveness, &def_use, &ctx);
 
-            for cover in cover_forest(&forest, &TILES) {
+            for cover in cover_forest(&forest, tiles) {
                 dfs(&forest, cover.root, &mut self.stream, &cover, interner)?;
             }
 

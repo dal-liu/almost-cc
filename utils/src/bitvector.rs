@@ -8,7 +8,7 @@ impl BitVector {
     const BITWORD_SIZE: usize = 64;
 
     pub fn new(len: usize) -> Self {
-        let num_words = (len + Self::BITWORD_SIZE - 1) / Self::BITWORD_SIZE;
+        let num_words = len.div_ceil(Self::BITWORD_SIZE);
         Self {
             vec: vec![0; num_words],
             len,

@@ -16,9 +16,8 @@ impl<T: Copy + Eq + Hash> Worklist<T> {
     }
 
     pub fn pop(&mut self) -> Option<T> {
-        self.queue.pop_front().and_then(|item| {
-            self.set.remove(&item);
-            Some(item)
+        self.queue.pop_front().inspect(|item| {
+            self.set.remove(item);
         })
     }
 
@@ -34,5 +33,11 @@ impl<T: Copy + Eq + Hash> Extend<T> for Worklist<T> {
         for item in iter {
             self.push(item);
         }
+    }
+}
+
+impl<T: Copy + Eq + Hash> Default for Worklist<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }

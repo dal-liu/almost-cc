@@ -60,4 +60,8 @@ impl<T: Clone + Eq + Hash> Interner<T> {
     pub fn get(&self, item: &T) -> usize {
         self.map[item]
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.vec.is_empty()
+    }
 }

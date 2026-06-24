@@ -103,11 +103,7 @@ impl ReachingDefAnalysis {
                     block_gen[i].set(k);
                 }
 
-                block_kill[i].set_from(
-                    def_table[&def]
-                        .iter()
-                        .filter_map(|id| (k != id).then_some(id)),
-                );
+                block_kill[i].set_from(def_table[&def].iter().filter(|&id| k != id));
             }
         }
 
@@ -128,7 +124,7 @@ impl Dataflow for ReachingDefAnalysis {
     }
 
     fn meet(&self, current: &mut BitVector, other: &BitVector) {
-        current.union(&other);
+        current.union(other);
     }
 
     fn transfer(&self, input: &BitVector, block_id: BlockId) -> BitVector {
@@ -185,11 +181,8 @@ pub fn compute_reaching_def(func: &mut Function) -> ReachingDefResult {
             inst_out[i][j] = inst_in[i][j].clone();
             if let Some(def) = inst.defs() {
                 let k = reaching_def.interner.get(&InstId(i, j));
-                inst_out[i][j].reset_from(
-                    reaching_def.def_table[&def]
-                        .iter()
-                        .filter_map(|idx| (k != idx).then_some(idx)),
-                );
+                inst_out[i][j]
+                    .reset_from(reaching_def.def_table[&def].iter().filter(|&idx| k != idx));
                 inst_out[i][j].set(k);
             }
         }

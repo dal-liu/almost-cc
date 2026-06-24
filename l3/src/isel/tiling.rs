@@ -105,7 +105,7 @@ macro_rules! pat {
     };
 }
 
-pub const TILES: LazyLock<Vec<Tile>> = LazyLock::new(tiles);
+pub static TILES: LazyLock<Vec<Tile>> = LazyLock::new(tiles);
 
 #[derive(Debug, Clone)]
 pub struct Pattern {
@@ -165,7 +165,7 @@ impl Tile {
                 .all(|(i, p)| dfs(forest, i, res, p, uncovered))
         }
 
-        dfs(forest, id, None, &self.pattern, &mut uncovered).then(|| uncovered)
+        dfs(forest, id, None, &self.pattern, &mut uncovered).then_some(uncovered)
     }
 }
 
@@ -202,7 +202,7 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
         let best = tiles
             .iter()
             .filter_map(|tile| {
-                tile.try_cover(forest, id).and_then(|uncovered| {
+                tile.try_cover(forest, id).map(|uncovered| {
                     let mut cost = tile.cost;
                     let mut map = HashMap::from([(id, tile)]);
 
@@ -211,11 +211,11 @@ pub fn cover_forest<'a>(forest: &SelectionForest, tiles: &'a [Tile]) -> Vec<Cove
                         map.extend(dp[child].map.iter());
                     }
 
-                    Some(Cover {
+                    Cover {
                         map,
                         cost,
                         root: id,
-                    })
+                    }
                 })
             })
             .min_by_key(|cover| cover.cost)

@@ -106,7 +106,6 @@ pub struct InterferenceGraphDisplay<'a> {
 impl DisplayResolved for InterferenceGraphDisplay<'_> {
     fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
         let mut lines: Vec<String> = (0..self.interference.num_nodes())
-            .into_iter()
             .map(|i| {
                 let mut line: Vec<String> = self.interference.graph[i]
                     .iter()
