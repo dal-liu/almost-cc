@@ -7,24 +7,6 @@ pub fn split_critical_edges(prog: &mut Program) {
         let critical_edges: Vec<(BlockId, BlockId)> = critical_edges(func).collect();
 
         for (suffix, &(u, v)) in critical_edges.iter().enumerate() {
-            let cfg = &mut func.cfg;
-            let new_block_id = BlockId(func.basic_blocks.len());
-
-            let pred_idx = cfg.predecessors[v.0]
-                .iter()
-                .position(|&pred| pred == u)
-                .expect("predecessors of destination block should contain source block");
-            cfg.predecessors[v.0][pred_idx] = new_block_id;
-
-            let succ_idx = cfg.successors[u.0]
-                .iter()
-                .position(|&succ| succ == v)
-                .expect("successors of source block should contain destination block");
-            cfg.successors[u.0][succ_idx] = new_block_id;
-
-            cfg.predecessors.push(vec![u]);
-            cfg.successors.push(vec![v]);
-
             let new_label = SymbolId(prog.interner.intern(format!("{}{}", prefix, suffix)));
             let old_label = func.basic_blocks[v.0].label;
 
@@ -50,6 +32,8 @@ pub fn split_critical_edges(prog: &mut Program) {
                 terminator: Instruction::Branch(old_label),
             });
         }
+
+        func.cfg = ControlFlowGraph::new(&func.basic_blocks);
     }
 }
 

@@ -1,7 +1,9 @@
 mod construct;
 mod destroy;
-mod splitting;
+mod hoist;
+mod split;
 
 pub use construct::construct_ssa_form;
 pub use destroy::destroy_ssa_form;
-pub use splitting::split_critical_edges;
+pub use hoist::hoist_define_instructions;
+pub use split::split_critical_edges;
