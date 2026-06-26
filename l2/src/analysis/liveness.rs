@@ -48,16 +48,13 @@ impl DisplayResolved for LivenessResult {
 }
 
 pub fn compute_liveness(func: &Function) -> LivenessResult {
-    let interner = func
+    let interner: Interner<Value> = func
         .basic_blocks
         .iter()
         .flat_map(|block| &block.instructions)
         .flat_map(|inst| inst.uses().chain(inst.defs()))
         .chain(Register::gp_registers().map(Value::Register))
-        .fold(Interner::new(), |mut interner, val| {
-            interner.intern(val);
-            interner
-        });
+        .collect();
 
     let num_gp_vars = interner.len();
     let num_blocks = func.basic_blocks.len();
@@ -76,8 +73,7 @@ pub fn compute_liveness(func: &Function) -> LivenessResult {
 
     let mut block_in = vec![BitVector::new(num_gp_vars); num_blocks];
     let mut block_out = vec![BitVector::new(num_gp_vars); num_blocks];
-    let mut worklist = Worklist::new();
-    worklist.extend((0..num_blocks).map(BlockId));
+    let mut worklist: Worklist<BlockId> = (0..num_blocks).map(BlockId).collect();
 
     while let Some(id) = worklist.pop() {
         let i = id.0;

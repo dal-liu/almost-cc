@@ -41,3 +41,13 @@ impl<T: Copy + Eq + Hash> Default for Worklist<T> {
         Self::new()
     }
 }
+
+impl<T: Copy + Eq + Hash> FromIterator<T> for Worklist<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut worklist = Self::new();
+        for item in iter {
+            worklist.push(item);
+        }
+        worklist
+    }
+}

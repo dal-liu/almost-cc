@@ -64,15 +64,12 @@ struct ReachingDefAnalysis {
 
 impl ReachingDefAnalysis {
     pub fn new(func: &Function) -> Self {
-        let interner = func
+        let interner: Interner<InstId> = func
             .basic_blocks
             .iter()
             .enumerate()
             .flat_map(|(i, block)| (0..block.instructions.len()).map(move |j| InstId(i, j)))
-            .fold(Interner::new(), |mut interner, inst_id| {
-                interner.intern(inst_id);
-                interner
-            });
+            .collect();
 
         let num_insts = interner.len();
         let mut def_table = HashMap::new();

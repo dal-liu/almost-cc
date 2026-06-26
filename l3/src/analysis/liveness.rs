@@ -40,16 +40,13 @@ struct LivenessAnalysis {
 
 impl LivenessAnalysis {
     pub fn new(func: &Function) -> Self {
-        let interner = func
+        let interner: Interner<SymbolId> = func
             .basic_blocks
             .iter()
             .flat_map(|block| &block.instructions)
             .flat_map(|inst| inst.uses().chain(inst.defs()))
             .chain(func.params.iter().copied())
-            .fold(Interner::new(), |mut interner, val| {
-                interner.intern(val);
-                interner
-            });
+            .collect();
 
         let num_vars = interner.len();
         let num_blocks = func.basic_blocks.len();

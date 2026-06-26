@@ -52,7 +52,7 @@ impl ColoringAllocator {
         interference: InterferenceGraph,
         loops: &LoopInfo,
     ) -> Self {
-        let inst_interner = func
+        let inst_interner: Interner<InstId> = func
             .basic_blocks
             .iter()
             .enumerate()
@@ -63,17 +63,15 @@ impl ColoringAllocator {
                     .enumerate()
                     .map(move |(j, inst)| (InstId(i, j), inst))
             })
-            .fold(Interner::new(), |mut interner, (id, inst)| {
-                match inst {
-                    Instruction::Assign { dst, src }
-                        if dst.is_gp_variable() && src.is_gp_variable() =>
-                    {
-                        interner.intern(id);
-                    }
-                    _ => (),
+            .filter_map(|(id, inst)| match inst {
+                Instruction::Assign { dst, src }
+                    if dst.is_gp_variable() && src.is_gp_variable() =>
+                {
+                    Some(id)
                 }
-                interner
-            });
+                _ => None,
+            })
+            .collect();
 
         let num_blocks = func.basic_blocks.len();
         let num_nodes = interference.num_nodes();
