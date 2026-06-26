@@ -56,6 +56,6 @@ fn critical_edges(func: &Function) -> impl Iterator<Item = (BlockId, BlockId)> {
         .flat_map(move |u| {
             cfg.successors[u]
                 .iter()
-                .filter_map(move |&v| (cfg.predecessors[v.0].len() > 1).then(|| (BlockId(u), v)))
+                .filter_map(move |&v| (cfg.predecessors[v.0].len() > 1).then_some((BlockId(u), v)))
         })
 }

@@ -425,6 +425,9 @@ impl DisplayResolved for Instruction {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InstId(pub usize, pub usize);
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PhiValue {
     pub val: Value,
@@ -489,6 +492,21 @@ impl Function {
             cfg,
             symtab,
         }
+    }
+
+    pub fn instruction(&self, inst_id: InstId) -> Option<&Instruction> {
+        self.basic_blocks.get(inst_id.0).and_then(|block| {
+            let i = inst_id.1;
+            let num_insts = block.instructions.len();
+
+            if i < num_insts {
+                Some(&block.instructions[i])
+            } else if i == num_insts {
+                Some(&block.terminator)
+            } else {
+                None
+            }
+        })
     }
 }
 

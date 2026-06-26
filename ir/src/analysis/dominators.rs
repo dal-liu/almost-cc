@@ -37,8 +37,8 @@ impl DominatorTree {
             }
         }
 
-        for i in 0..num_blocks {
-            sdom[i].reset(i);
+        for (i, doms) in sdom.iter_mut().enumerate() {
+            doms.reset(i);
         }
 
         let idom: Vec<Option<BlockId>> = sdom
@@ -104,10 +104,10 @@ impl<'a> DominanceFrontier {
         let num_blocks = func.basic_blocks.len();
         let mut local_frontier = vec![BitVector::new(num_blocks); num_blocks];
 
-        for i in 0..num_blocks {
+        for (i, front) in local_frontier.iter_mut().enumerate() {
             for &succ in &func.cfg.successors[i] {
                 if i == succ.0 || !dom_tree.dominates(BlockId(i), succ) {
-                    local_frontier[i].set(succ.0);
+                    front.set(succ.0);
                 }
             }
         }

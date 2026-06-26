@@ -6,7 +6,7 @@ pub fn hoist_define_instructions(prog: &mut Program) {
             block
                 .instructions
                 .extract_if(.., |inst| matches!(inst, Instruction::Define { .. }))
-                .collect::<Vec<Instruction>>()
+                .collect()
         }) {
             func.basic_blocks.insert(
                 0,

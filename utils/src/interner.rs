@@ -65,3 +65,13 @@ impl<T: Clone + Eq + Hash> Interner<T> {
         self.vec.is_empty()
     }
 }
+
+impl<T: Clone + Eq + Hash> FromIterator<T> for Interner<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut interner = Self::new();
+        for item in iter {
+            interner.intern(item);
+        }
+        interner
+    }
+}

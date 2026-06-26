@@ -4,24 +4,25 @@ use std::iter;
 use ir::*;
 
 pub struct DefUseChain {
-    users: HashMap<SymbolId, Vec<Instruction>>,
+    users: HashMap<SymbolId, Vec<InstId>>,
 }
 
 impl DefUseChain {
     pub fn new(func: &Function) -> Self {
-        let mut users: HashMap<SymbolId, Vec<Instruction>> = HashMap::new();
+        let mut users: HashMap<SymbolId, Vec<InstId>> = HashMap::new();
 
-        for block in &func.basic_blocks {
-            for inst in block
+        for (i, block) in func.basic_blocks.iter().enumerate() {
+            for (j, inst) in block
                 .instructions
                 .iter()
                 .chain(iter::once(&block.terminator))
+                .enumerate()
             {
                 for &use_ in inst.uses().filter_map(|val| match val {
                     Value::Variable(var) => Some(var),
                     _ => None,
                 }) {
-                    users.entry(use_).or_default().push(inst.clone());
+                    users.entry(use_).or_default().push(InstId(i, j));
                 }
             }
         }
@@ -29,7 +30,7 @@ impl DefUseChain {
         Self { users }
     }
 
-    pub fn users(&self, def: SymbolId) -> impl Iterator<Item = &Instruction> {
-        self.users.get(&def).into_iter().flatten()
+    pub fn users(&self, def: SymbolId) -> impl Iterator<Item = InstId> {
+        self.users.get(&def).into_iter().flatten().copied()
     }
 }

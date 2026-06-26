@@ -20,10 +20,8 @@ pub fn construct_ssa_form(prog: &mut Program) {
                     .iter()
                     .flat_map(|block| block.instructions.iter().filter_map(|inst| inst.defs())),
             )
-            .fold(Interner::new(), |mut interner, &def| {
-                interner.intern(def);
-                interner
-            });
+            .copied()
+            .collect();
 
         place_phi_nodes(func, &dom_front, &interner);
         rename_variables(func, &mut prog.interner, &dom_tree, &interner);
@@ -43,7 +41,7 @@ fn place_phi_nodes(
     }
     for (i, block) in func.basic_blocks.iter().enumerate() {
         for def in block.instructions.iter().filter_map(|inst| inst.defs()) {
-            def_blocks[var_id_interner.get(&def)].set(i);
+            def_blocks[var_id_interner.get(def)].set(i);
         }
     }
 
@@ -113,7 +111,7 @@ fn rename_variables(
         func,
         string_interner,
         dom_tree,
-        &var_id_interner,
+        var_id_interner,
         &mut counter,
         &mut stack,
         BlockId(0),
@@ -149,7 +147,7 @@ fn dfs(
         }
 
         if let Some(def) = inst.defs_mut() {
-            let v = var_id_interner.get(&def);
+            let v = var_id_interner.get(def);
             let i = counter[v];
             *def = new_var(string_interner, &mut func.symtab, *def, i);
             stack[v].push(i);

@@ -52,7 +52,7 @@ fn type_<'src>() -> impl Parser<'src, &'src str, Type, IRExtra<'src>> {
     choice((
         just("int64")
             .ignore_then(just("[]").repeated().at_least(1).count())
-            .map(|ndims| Type::Array(ndims)),
+            .map(Type::Array),
         just("int64").to(Type::Int64),
         just("tuple").to(Type::Tuple),
         just("code").to(Type::Code),

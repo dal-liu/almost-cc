@@ -1,24 +1,12 @@
 use std::collections::HashMap;
-use std::fmt;
 
 use ir::*;
-use utils::interner::{DisplayResolved, Interner};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operand {
     Argument,
     Constant,
-    Local(Instruction),
-}
-
-impl DisplayResolved for Operand {
-    fn fmt_with(&self, f: &mut fmt::Formatter, interner: &Interner<String>) -> fmt::Result {
-        match self {
-            Self::Argument => write!(f, "arg"),
-            Self::Constant => write!(f, "const"),
-            Self::Local(inst) => write!(f, "{}", inst.resolved(interner)),
-        }
-    }
+    Local(InstId),
 }
 
 #[derive(Debug)]
@@ -35,16 +23,17 @@ impl UseDefChain {
             .chain(
                 func.basic_blocks
                     .iter()
-                    .flat_map(|block| &block.instructions)
-                    .filter_map(|inst| {
-                        inst.defs()
-                            .and_then(|&def| Some((def, Operand::Local(inst.clone()))))
-                    }),
+                    .enumerate()
+                    .flat_map(|(i, block)| {
+                        block
+                            .instructions
+                            .iter()
+                            .enumerate()
+                            .map(move |(j, inst)| (inst, InstId(i, j)))
+                    })
+                    .filter_map(|(inst, id)| inst.defs().map(|&def| (def, Operand::Local(id)))),
             )
-            .fold(HashMap::new(), |mut def_table, (def, op)| {
-                def_table.insert(def, op);
-                def_table
-            });
+            .collect();
         Self { def_table }
     }
 
