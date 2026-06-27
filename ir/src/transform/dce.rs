@@ -22,11 +22,15 @@ pub fn run_dce_pass(func: &mut Function) -> bool {
         .collect();
 
     while let Some(var) = worklist.pop() {
-        if def_use.users(var).next().is_some() {
+        if def_use
+            .users
+            .get(&var)
+            .is_some_and(|users| !users.is_empty())
+        {
             continue;
         }
 
-        let Some(def_inst) = use_def.def_table.get(&var).and_then(|op| match op {
+        let Some(dead_id) = use_def.def_table.get(&var).and_then(|op| match op {
             Operand::Local(inst_id)
                 if func.instruction(*inst_id).is_some_and(|inst| {
                     !matches!(
@@ -45,8 +49,8 @@ pub fn run_dce_pass(func: &mut Function) -> bool {
         };
 
         for var in func
-            .instruction(def_inst)
-            .unwrap()
+            .instruction(dead_id)
+            .expect("dead id should be valid instruction")
             .uses()
             .filter_map(|use_| match use_ {
                 Value::Variable(var) => Some(*var),
@@ -54,13 +58,13 @@ pub fn run_dce_pass(func: &mut Function) -> bool {
             })
         {
             if let Some(users) = def_use.users.get_mut(&var) {
-                users.retain(|&inst_id| inst_id != def_inst);
+                users.retain(|&inst_id| inst_id != dead_id);
             };
 
             worklist.push(var);
         }
 
-        modified |= to_delete.insert(def_inst);
+        modified |= to_delete.insert(dead_id);
     }
 
     for (i, block) in func.basic_blocks.iter_mut().enumerate() {

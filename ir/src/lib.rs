@@ -508,6 +508,21 @@ impl Function {
             }
         })
     }
+
+    pub fn instruction_mut(&mut self, inst_id: InstId) -> Option<&mut Instruction> {
+        self.basic_blocks.get_mut(inst_id.0).and_then(|block| {
+            let i = inst_id.1;
+            let num_insts = block.instructions.len();
+
+            if i < num_insts {
+                Some(&mut block.instructions[i])
+            } else if i == num_insts {
+                Some(&mut block.terminator)
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl DisplayResolved for Function {

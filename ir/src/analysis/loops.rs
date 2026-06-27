@@ -110,6 +110,7 @@ impl LoopInfo {
         }
     }
 
+    #[allow(dead_code)]
     pub fn display<'a>(&'a self, func: &'a Function) -> LoopInfoDisplay<'a> {
         LoopInfoDisplay { func, loops: self }
     }

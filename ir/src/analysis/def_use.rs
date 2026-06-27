@@ -29,8 +29,4 @@ impl DefUseChain {
 
         Self { users }
     }
-
-    pub fn users(&self, def: SymbolId) -> impl Iterator<Item = InstId> {
-        self.users.get(&def).into_iter().flatten().copied()
-    }
 }

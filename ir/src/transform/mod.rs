@@ -1,3 +1,5 @@
+mod constant_fold;
+mod constant_prop;
 mod dce;
 mod pass;
 mod pipeline;
