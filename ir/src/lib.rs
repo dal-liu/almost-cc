@@ -33,6 +33,7 @@ pub enum Callee {
     Input,
     TupleError,
     TensorError,
+    Allocate,
 }
 
 impl DisplayResolved for Callee {
@@ -43,6 +44,7 @@ impl DisplayResolved for Callee {
             Self::Input => write!(f, "input"),
             Self::TupleError => write!(f, "tuple-error"),
             Self::TensorError => write!(f, "tensor-error"),
+            Self::Allocate => write!(f, "allocate"),
         }
     }
 }
@@ -173,6 +175,14 @@ pub enum Instruction {
         dst: SymbolId,
         vals: Vec<PhiValue>,
     },
+    Load {
+        dst: SymbolId,
+        src: Value,
+    },
+    Store {
+        dst: Value,
+        src: Value,
+    },
 }
 
 impl Instruction {
@@ -190,14 +200,16 @@ impl Instruction {
             | CallResult { dst, .. }
             | NewArray { dst, .. }
             | NewTuple { dst, .. }
-            | PhiNode { dst, .. } => Some(dst),
+            | PhiNode { dst, .. }
+            | Load { dst, .. } => Some(dst),
 
             Insert { .. }
             | Call { .. }
             | Branch(_)
             | BranchCondition { .. }
             | Return
-            | ReturnValue(_) => None,
+            | ReturnValue(_)
+            | Store { .. } => None,
         }
     }
 
@@ -207,7 +219,9 @@ impl Instruction {
         match self {
             Define { .. } | Branch(_) | Return => Box::new(iter::empty()),
 
-            Assign { src, .. } => Box::new(iter::once(src)),
+            Assign { src, .. } | TupleLength { src, .. } | Load { src, .. } => {
+                Box::new(iter::once(src))
+            }
 
             Binary { lhs, rhs, .. } => Box::new([lhs, rhs].into_iter()),
 
@@ -218,8 +232,6 @@ impl Instruction {
             }
 
             ArrayLength { src, dim, .. } => Box::new([src, dim].into_iter()),
-
-            TupleLength { src, .. } => Box::new(iter::once(src)),
 
             Call { callee, args } | CallResult { callee, args, .. } => {
                 Box::new(args.iter().chain(match callee {
@@ -237,6 +249,8 @@ impl Instruction {
             ReturnValue(val) => Box::new(iter::once(val)),
 
             PhiNode { vals, .. } => Box::new(vals.iter().map(|val| &val.val)),
+
+            Store { dst, src } => Box::new([dst, src].into_iter()),
         }
     }
 
@@ -254,14 +268,16 @@ impl Instruction {
             | CallResult { dst, .. }
             | NewArray { dst, .. }
             | NewTuple { dst, .. }
-            | PhiNode { dst, .. } => Some(dst),
+            | PhiNode { dst, .. }
+            | Load { dst, .. } => Some(dst),
 
             Insert { .. }
             | Call { .. }
             | Branch(_)
             | BranchCondition { .. }
             | Return
-            | ReturnValue(_) => None,
+            | ReturnValue(_)
+            | Store { .. } => None,
         }
     }
 
@@ -271,7 +287,9 @@ impl Instruction {
         match self {
             Define { .. } | Branch(_) | Return => Box::new(iter::empty()),
 
-            Assign { src, .. } => Box::new(iter::once(src)),
+            Assign { src, .. } | TupleLength { src, .. } | Load { src, .. } => {
+                Box::new(iter::once(src))
+            }
 
             Binary { lhs, rhs, .. } => Box::new([lhs, rhs].into_iter()),
 
@@ -284,8 +302,6 @@ impl Instruction {
             ),
 
             ArrayLength { src, dim, .. } => Box::new([src, dim].into_iter()),
-
-            TupleLength { src, .. } => Box::new(iter::once(src)),
 
             Call { callee, args } | CallResult { callee, args, .. } => {
                 Box::new(args.iter_mut().chain(match callee {
@@ -303,6 +319,8 @@ impl Instruction {
             ReturnValue(val) => Box::new(iter::once(val)),
 
             PhiNode { vals, .. } => Box::new(vals.iter_mut().map(|val| &mut val.val)),
+
+            Store { dst, src } => Box::new([dst, src].into_iter()),
         }
     }
 }
@@ -420,6 +438,18 @@ impl DisplayResolved for Instruction {
                     .map(|phi_val| phi_val.resolved(interner).to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
+            ),
+            Load { dst, src } => write!(
+                f,
+                "%{} <- load {}",
+                dst.resolved(interner),
+                src.resolved(interner)
+            ),
+            Store { dst, src } => write!(
+                f,
+                "store {} <- {}",
+                dst.resolved(interner),
+                src.resolved(interner)
             ),
         }
     }

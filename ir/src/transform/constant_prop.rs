@@ -23,27 +23,6 @@ pub fn run_constant_prop_pass(func: &mut Function) -> bool {
             .instruction(inst_id)
             .expect("inst id should be valid instruction")
         {
-            Instruction::PhiNode { dst, vals } => {
-                let is_constant = |vals: &[PhiValue]| {
-                    let mut iter = vals.iter().map(|phi_val| &phi_val.val);
-                    let Some(&Value::Number(first_num)) = iter.next() else {
-                        return None;
-                    };
-                    iter.all(|val| matches!(val, &Value::Number(num) if num == first_num))
-                        .then_some(first_num)
-                };
-
-                if let Some(num) = is_constant(vals) {
-                    *func
-                        .instruction_mut(inst_id)
-                        .expect("inst id should be valid instruction") = Instruction::Assign {
-                        dst: *dst,
-                        src: Value::Number(num),
-                    };
-                    modified = true;
-                }
-            }
-
             Instruction::Assign { dst, src } => {
                 let &Value::Number(num) = src else {
                     continue;
@@ -65,6 +44,27 @@ pub fn run_constant_prop_pass(func: &mut Function) -> bool {
                 }
 
                 modified |= to_delete.insert(inst_id);
+            }
+
+            Instruction::PhiNode { dst, vals } => {
+                let is_constant = |vals: &[PhiValue]| {
+                    let mut iter = vals.iter().map(|phi_val| &phi_val.val);
+                    let Some(&Value::Number(first_num)) = iter.next() else {
+                        return None;
+                    };
+                    iter.all(|val| matches!(val, &Value::Number(num) if num == first_num))
+                        .then_some(first_num)
+                };
+
+                if let Some(num) = is_constant(vals) {
+                    *func
+                        .instruction_mut(inst_id)
+                        .expect("inst id should be valid instruction") = Instruction::Assign {
+                        dst: *dst,
+                        src: Value::Number(num),
+                    };
+                    modified = true;
+                }
             }
 
             _ => (),
