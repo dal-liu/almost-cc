@@ -1,5 +1,4 @@
 use ir::*;
-use l3;
 use utils::interner::Interner;
 
 use crate::analysis::dominators::DominatorTree;
@@ -139,6 +138,7 @@ fn translate_index_instruction(
     match func.symtab.type_map.get(var) {
         Some(Type::Array(ndims)) if idxs.len() == *ndims => {
             let ndims = *ndims as i64;
+            let num_idxs = idxs.len();
 
             let dims: Vec<l3::SymbolId> = (1..ndims)
                 .map(|i| {
@@ -168,23 +168,23 @@ fn translate_index_instruction(
 
             l3_instructions.push(l3::Instruction::Assign {
                 dst: offset,
-                src: translate_value(&idxs[idxs.len() - 1]),
+                src: translate_value(&idxs[num_idxs - 1]),
             });
 
-            for i in 0..idxs.len() - 1 {
+            for (i, idx) in idxs.iter().take(num_idxs - 1).enumerate() {
                 let linearized_idx = new_l3_variable_name(interner, prefix, suffix);
 
                 l3_instructions.push(l3::Instruction::Assign {
                     dst: linearized_idx,
-                    src: translate_value(&idxs[i]),
+                    src: translate_value(idx),
                 });
 
-                for j in i..idxs.len() - 1 {
+                for &dim in dims.iter().take(num_idxs - 1).skip(i) {
                     l3_instructions.push(l3::Instruction::Binary {
                         dst: linearized_idx,
                         lhs: l3::Value::Variable(linearized_idx),
                         op: l3::BinaryOp::Mul,
-                        rhs: l3::Value::Variable(dims[j]),
+                        rhs: l3::Value::Variable(dim),
                     });
                 }
 
@@ -269,12 +269,12 @@ fn translate_new_array_instruction(
         src: l3::Value::Variable(decoded_dims[0]),
     });
 
-    for i in 1..decoded_dims.len() {
+    for &dim in decoded_dims.iter().skip(1) {
         l3_instructions.push(l3::Instruction::Binary {
             dst: array_size,
             lhs: l3::Value::Variable(array_size),
             op: l3::BinaryOp::Mul,
-            rhs: l3::Value::Variable(decoded_dims[i]),
+            rhs: l3::Value::Variable(dim),
         });
     }
 
@@ -417,13 +417,13 @@ fn translate_instruction(
 
         Instruction::Call { callee, args } => vec![l3::Instruction::Call {
             callee: translate_callee(callee),
-            args: args.iter().map(|arg| translate_value(arg)).collect(),
+            args: args.iter().map(translate_value).collect(),
         }],
 
         Instruction::CallResult { dst, callee, args } => vec![l3::Instruction::CallResult {
             dst: translate_symbol_id(dst),
             callee: translate_callee(callee),
-            args: args.iter().map(|arg| translate_value(arg)).collect(),
+            args: args.iter().map(translate_value).collect(),
         }],
 
         Instruction::NewArray { dst, dims } => {
@@ -465,10 +465,10 @@ fn translate_function(func: &Function, interner: &mut Interner<String>) -> l3::F
 
         match &func.basic_blocks[block_id.0].terminator {
             Instruction::Branch(label) => {
-                if i < trace_order.len() - 1 {
-                    if label == &func.basic_blocks[trace_order[i + 1].0].label {
-                        continue;
-                    }
+                if i < trace_order.len() - 1
+                    && label == &func.basic_blocks[trace_order[i + 1].0].label
+                {
+                    continue;
                 }
                 l3_instructions.push(l3::Instruction::Branch(translate_symbol_id(label)));
             }

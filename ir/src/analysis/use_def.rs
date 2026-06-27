@@ -11,7 +11,7 @@ pub enum Operand {
 
 #[derive(Debug)]
 pub struct UseDefChain {
-    def_table: HashMap<SymbolId, Operand>,
+    pub def_table: HashMap<SymbolId, Operand>,
 }
 
 impl UseDefChain {
@@ -29,9 +29,9 @@ impl UseDefChain {
                             .instructions
                             .iter()
                             .enumerate()
-                            .map(move |(j, inst)| (inst, InstId(i, j)))
+                            .map(move |(j, inst)| (InstId(i, j), inst))
                     })
-                    .filter_map(|(inst, id)| inst.defs().map(|&def| (def, Operand::Local(id)))),
+                    .filter_map(|(id, inst)| inst.defs().map(|&def| (def, Operand::Local(id)))),
             )
             .collect();
         Self { def_table }

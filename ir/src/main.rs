@@ -11,9 +11,7 @@ use utils::cli::Cli;
 
 use crate::codegen::generate_code;
 use crate::parser::parse_file;
-use crate::ssa::{
-    construct_ssa_form, destroy_ssa_form, hoist_define_instructions, split_critical_edges,
-};
+use crate::transform::run_opt_pipeline;
 
 fn main() {
     let cli = Cli::parse();
@@ -23,10 +21,7 @@ fn main() {
         }
 
         if cli.opt_level > 0 {
-            hoist_define_instructions(&mut prog);
-            construct_ssa_form(&mut prog);
-            split_critical_edges(&mut prog);
-            destroy_ssa_form(&mut prog);
+            run_opt_pipeline(&mut prog);
         }
 
         if cli.generate == 1 {

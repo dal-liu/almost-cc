@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use ir::*;
 
 pub trait Pass {
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     fn run(&mut self, func: &mut Function, ctx: &mut PassContext) -> bool;
 }

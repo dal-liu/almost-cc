@@ -4,7 +4,7 @@ use std::iter;
 use ir::*;
 
 pub struct DefUseChain {
-    users: HashMap<SymbolId, Vec<InstId>>,
+    pub users: HashMap<SymbolId, Vec<InstId>>,
 }
 
 impl DefUseChain {
