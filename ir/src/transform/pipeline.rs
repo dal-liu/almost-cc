@@ -9,10 +9,10 @@ pub fn run_opt_pipeline(prog: &mut Program) {
         loop {
             let mut modified = false;
 
-            modified |= run_dce_pass(func);
             modified |= run_copy_prop_pass(func);
             modified |= run_constant_prop_pass(func);
             modified |= run_constant_fold_pass(func);
+            modified |= run_dce_pass(func);
 
             if !modified {
                 break;

@@ -47,6 +47,15 @@ macro_rules! pat {
         }
     };
 
+    (pow) => {
+        Pattern {
+            children: Vec::new(),
+            matches: |forest, id, _| {
+                matches!(forest.result(id), Some(Value::Number(num)) if *num > 0 && *num & (num - 1) == 0).then_some(None)
+            },
+        }
+    };
+
     (scale) => {
         Pattern {
             children: Vec::new(),

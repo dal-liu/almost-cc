@@ -10,7 +10,7 @@ use crate::analysis::liveness::compute_liveness;
 use crate::analysis::reaching_def::compute_reaching_def;
 use crate::isel::contexts::create_contexts;
 use crate::isel::forest::{NodeId, NodeKind, SelectionForest, generate_forest};
-use crate::isel::tiling::{Cover, TILES, cover_forest};
+use crate::isel::tiles::{Cover, TILES, cover_forest};
 use crate::translate::{translate_symbol_id, translate_value};
 
 const LABEL_OFFSET: usize = 1;
